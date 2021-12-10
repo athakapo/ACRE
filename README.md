@@ -11,7 +11,7 @@ Installation
 Example Usage
 ------------
 ```
-s = "Python syntax highlighting"
+
 ```
 
 Project Organization
@@ -33,7 +33,7 @@ Following [Spinning Up](https://spinningup.openai.com/en/latest/) nomenclature:
     ├── data                            <- Data folder for each algorithm to save checkpoints 
     |                                      and reproduce experiments
     │
-    ├── images                          <- Generated graphics and figures to be used in reporting
+    ├── images                          <- Generated graphics and figures for the repository README
     │
     ├── tensorboard                     <- Monitor the progress of learning curves in real-time
     │                                      with the power of tensorboard
@@ -44,9 +44,11 @@ Following [Spinning Up](https://spinningup.openai.com/en/latest/) nomenclature:
     │   ├── ModifiedTensorBoard.py      <- Tensorboard
     │   ├── mpi_pytorch.py              <- Data-parallel PyTorch optimization across MPI processes
     │   ├── mpi_tools.py                <- MPI tools
-    │   ├── run_utils.py                <- ExperimentGrid for ablation studies and Experiment repruduction
+    │   ├── run_utils.py                <- Utilities for running experiments
     │   └── serialization_utils.py      <- Serialization utilities
     │
+    ├── run.py                          <- Run a single instance of {Algorithm-Environment}
+    ├── run_experiment_grid.py          <- Run the same algorithm with many possible hyperparameters
     ├── requirements.txt                <- The requirements file for reproducing the python environment
 
 Simulation results

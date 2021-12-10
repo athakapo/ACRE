@@ -1,14 +1,11 @@
-# Disable TF deprecation warnings.
-# Syntax from tf1 is not expected to be compatible with tf2.
-import tensorflow as tf
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-
 # Algorithms
 
 from algos.acre.acre import acre as acre
+from algos.ddpg.ddpg import ddpg as ddpg
+from algos.ppo.ppo import ppo as ppo
+from algos.sac.sac import sac as sac
+from algos.td3.td3 import td3 as td3
 
 # Loggers
-from utils.logx import Logger, EpochLogger
 
 # Version
-from algos.version import __version__
