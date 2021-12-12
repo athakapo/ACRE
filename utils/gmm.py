@@ -14,14 +14,13 @@ MIN_LOG_PROB = -20
 
 class GMM:
 
-    def __init__(self, list_state_type, n_components=7, with_plot=False, goal_position=None):
+    def __init__(self, list_state_type, n_components=7, with_plot=False):
         # self.model = mixture.GaussianMixture(n_components=n_components)
         self.model = mixture.GaussianMixture(n_components=n_components,
                                              covariance_type='diag',
                                              reg_covar=1e-5,
                                              warm_start=True)
         self.trained = False
-        self.goal_position=goal_position
         self.viewer = None
 
         self.n_components = n_components

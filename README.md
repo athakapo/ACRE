@@ -10,9 +10,23 @@ Installation
 
 Example Usage
 ------------
+1. Open up `terminal`, navigate to project's repository and activate python environment
 ```
-
+. venv/bin/activate
 ```
+2. Add `[ACRE]` project into your `PYTHONPATH`
+```
+export PYTHONPATH="$PWD"
+```
+3. Execute a python scrypt
+   1. **[1<sup>rst</sup> Example]** Run ACRE algorithm for `MountainCarContinuous-v0` environment
+      ```
+      python algos/acre/acre.py --env MountainCarContinuous-v0
+      ```
+   2. **[2<sup>nd</sup> Example]** After defining the values in run_experiment_grid.py execute:
+      ```
+      python run_experiment_grid.py
+      ```
 
 Project Organization
 ------------
@@ -22,8 +36,8 @@ Following [Spinning Up](https://spinningup.openai.com/en/latest/) nomenclature:
     ├── algos                           <- All supported RL algorithms
     │   ├── acre                        <- ACRE folder
     │   │   ├── acre.py                 <- Algorithm logic and learning process
-    │   │   ├── acre_MountainCarContinuous-v0.py <- Instantiate ACRE for MountainCarContinuous-v0 environment
-    │   │   ├── acre_Swimmer-v2.py      <- Instantiate ACRE for Swimmer-v2 environment
+    │   │   ├── acre_MountainCarContinuous-v0.py <- Saved ACRE parameters for MountainCarContinuous-v0 environment
+    │   │   ├── acre_Swimmer-v2.py      <- Saved ACRE parameters for Swimmer-v2 environment
     │   │   └── core.py                 <- Neural networks definitions and varius ACRE utilities
     │   ├── ddpg                        <- DDPG https://arxiv.org/abs/1509.02971
     │   ├── ppo                         <- PPO https://arxiv.org/abs/1707.06347
@@ -47,7 +61,6 @@ Following [Spinning Up](https://spinningup.openai.com/en/latest/) nomenclature:
     │   ├── run_utils.py                <- Utilities for running experiments
     │   └── serialization_utils.py      <- Serialization utilities
     │
-    ├── run.py                          <- Run a single instance of {Algorithm-Environment}
     ├── run_experiment_grid.py          <- Run the same algorithm with many possible hyperparameters
     ├── requirements.txt                <- The requirements file for reproducing the python environment
 
@@ -72,6 +85,7 @@ ACRE algorithm was evaluated on **12 continuous control tasks** from the most we
    4. *quadruped-walk*
 
 The performance of ACRE in comparison with [A2C](https://arxiv.org/abs/1602.01783), [DDPG](https://arxiv.org/abs/1509.02971), [PPO](https://arxiv.org/abs/1707.06347), [SAC](https://arxiv.org/abs/1801.01290), [TD3](https://arxiv.org/abs/1802.09477) and [TRPO](https://arxiv.org/abs/1502.05477) is illustrated in the following figure:
+
 ![ACRE experiments](images/experiments.png)
 
 Contributing
