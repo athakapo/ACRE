@@ -52,7 +52,8 @@ def parse_and_execute_grid_search(cmd, args):
         print('\n\nUsing default backend (%s) for %s.\n'%(backend, cmd))
         cmd = cmd + '_' + backend
 
-    algo = eval('spinup.'+cmd)
+    #algo = eval('spinup.'+cmd)
+    algo = eval(cmd)
 
     # Before all else, check to see if any of the flags is 'help'.
     valid_help = ['--help', '-h', 'help']
