@@ -7,7 +7,23 @@ ACRE is a model-free, off-policy RL algorithm specifically designed to incorpora
 
 Installation
 ------------
-
+1. Open up `terminal` and clone this repository
+```
+git clone https://github.com/athakapo/ACRE.git
+``` 
+2. Enter project's repository and create a new python environment of your choice. Here we provide a `venv` example, however the installation instructions using `conda` environment is pretty similar.
+```
+cd ACRE
+python -m venv venv
+``` 
+2. Activate the environment
+```
+. venv/bin/activate
+```
+3. Install the needed dependencies
+```
+python -m pip install -r requirements.txt
+```
 Example Usage
 ------------
 1. Open up `terminal`, navigate to project's repository and activate python environment
@@ -23,7 +39,7 @@ export PYTHONPATH="$PWD"
       ```
       python algos/acre/acre.py --env MountainCarContinuous-v0
       ```
-   2. **[2<sup>nd</sup> Example]** After defining the values in run_experiment_grid.py execute:
+   2. **[2<sup>nd</sup> Example]** After defining the values in run_experiment_grid.py execute
       ```
       python run_experiment_grid.py
       ```
