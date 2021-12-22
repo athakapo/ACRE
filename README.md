@@ -44,7 +44,7 @@ export PYTHONPATH="$PWD"
       python run_experiment_grid.py
       ```
 
-Project Organization
+Project Structure
 ------------
 Following [Spinning Up](https://spinningup.openai.com/en/latest/) nomenclature:
 
