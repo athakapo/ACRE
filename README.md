@@ -107,7 +107,7 @@ The performance of ACRE in comparison with [A2C](https://arxiv.org/abs/1602.0178
 Contributing
 ------------
 Contributions, issues and feature requests are welcome!
-Feel free to check [issues page](https://github.com/athakapo/ACRE/issues).
+Feel free to use [issues page](https://github.com/athakapo/ACRE/issues).
 
 
 Cite as
