@@ -14,7 +14,6 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=500)
-    parser.add_argument('--alpha', type=float, default=0.0)
     parser.add_argument('--beta', type=float, default=0.0007)
     parser.add_argument('--n_components', type=float, default=7)
     parser.add_argument('--multiplier_gmm_samples', type=int, default=60)
@@ -46,7 +45,7 @@ if __name__ == '__main__':
             ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
             gamma=args.gamma, seed=args.seed, epochs=args.epochs, beta=args.beta, plot_gmm=args.plot_gmm,
             n_components=args.n_components, mult_gmm_samples=args.multiplier_gmm_samples,
-            estimate_gmm_every=args.estimate_gmm_every, alpha=args.alpha, q_powered_gmm=args.q_powered_gmm,
+            estimate_gmm_every=args.estimate_gmm_every, q_powered_gmm=args.q_powered_gmm,
             logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
 
 
