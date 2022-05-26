@@ -131,3 +131,21 @@ class MLPActorCritic(nn.Module):
 
     def act(self, obs):
         return self.step(obs)[0]
+
+class RNDModel(nn.Module):
+    def __init__(self, obs_dim, output_size,
+                 hidden_sizes=(64, 64), activation=nn.Tanh):
+        super().__init__()
+
+        self.target = mlp([obs_dim] + list(hidden_sizes) + [output_size], activation)
+        self.predictor = mlp([obs_dim] + list(hidden_sizes) + [output_size], activation)
+
+        for param in self.target.parameters():
+            param.requires_grad = False
+
+    def forward(self, next_obs):
+        predict_feature = self.predictor(next_obs)
+        with torch.no_grad():
+            target_feature = self.target(next_obs)
+
+        return ((target_feature - predict_feature) ** 2).mean()

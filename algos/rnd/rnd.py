@@ -8,6 +8,7 @@ import gym
 import time
 
 from algos.rnd import core
+from algos.rnd.core import RNDModel
 from utils.logx import EpochLogger, TensorBoardLogger
 from utils.mpi_pytorch import setup_pytorch_for_mpi, sync_params, mpi_avg_grads
 from utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
@@ -130,7 +131,7 @@ class PPOBuffer:
 
 def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=None,
         reward_eng=False, seed=0, init_steps_obs_std=1000, steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
-        vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=0.1,
+        vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=0.1, RNDoutput_size = 40, #TODO check me out
         target_kl=0.01, logger_kwargs=dict(), logger_tb_args=dict(), save_freq=10):
     """
     Random Network Distillation (by clipping),
@@ -274,6 +275,9 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
     # Sync params across processes
     sync_params(ac)
 
+    # Create RND model
+    explore = RNDModel(obs_dim[0], RNDoutput_size)
+
     # Count variables
     var_counts = tuple(core.count_vars(module) for module in [ac.pi, ac.v])
     logger.log('\nNumber of parameters: \t pi: %d, \t v: %d\n' % var_counts)
@@ -378,10 +382,10 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
             a, v, logp = ac.step(torch.as_tensor(o, dtype=torch.float32))
             v_i = random.random() #TODO this should be retrieved from ac.step()
 
-            next_o, r, d, _ = env.step(a)
-
             # Calculate intrinsic reward
-            r_i = random.random() #TODO fix me
+            r_i = explore(torch.as_tensor(o, dtype=torch.float32))
+
+            next_o, r, d, _ = env.step(a)
 
             ep_ret += r
             ep_len += 1
