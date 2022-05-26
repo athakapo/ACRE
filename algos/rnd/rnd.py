@@ -1,4 +1,5 @@
 import math
+import random
 
 import numpy as np
 import torch
@@ -24,13 +25,14 @@ class PPOBuffer:
         self.act_buf = np.zeros(core.combined_shape(size, act_dim), dtype=np.float32)
         self.adv_buf = np.zeros(size, dtype=np.float32)
         self.rew_buf = np.zeros(size, dtype=np.float32)
+        self.intr_buf = np.zeros(size, dtype=np.float32)
         self.ret_buf = np.zeros(size, dtype=np.float32)
         self.val_buf = np.zeros(size, dtype=np.float32)
         self.logp_buf = np.zeros(size, dtype=np.float32)
         self.gamma, self.lam = gamma, lam
         self.ptr, self.path_start_idx, self.max_size = 0, 0, size
 
-    def store(self, obs, act, rew, val, logp):
+    def store(self, obs, act, rew, intr, val, logp):
         """
         Append one timestep of agent-environment interaction to the buffer.
         """
@@ -38,6 +40,7 @@ class PPOBuffer:
         self.obs_buf[self.ptr] = obs
         self.act_buf[self.ptr] = act
         self.rew_buf[self.ptr] = rew
+        self.intr_buf[self.ptr] = intr
         self.val_buf[self.ptr] = val
         self.logp_buf[self.ptr] = logp
         self.ptr += 1
@@ -88,11 +91,11 @@ class PPOBuffer:
 
 
 def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=None,
-        reward_eng=False, seed=0, steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
+        reward_eng=False, seed=0, init_steps_obs_std=1000, steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
         vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000,
         target_kl=0.01, logger_kwargs=dict(), logger_tb_args=dict(), save_freq=10):
     """
-    Proximal Policy Optimization (by clipping),
+    Random Network Distillation (by clipping),
 
     with early stopping based on approximate KL*
 
@@ -308,6 +311,25 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
                      DeltaLossPi=(loss_pi.item() - pi_l_old),
                      DeltaLossV=(loss_v.item() - v_l_old))
 
+    """ calculate initial observation std """
+    store_observation = []
+    init_cnt = 0
+    while True:
+        env.reset()
+        while True:  # observation normalize
+            action = env.action_space.sample()  # uniform random action.
+            next_obs, _, done, _ = env.step(action)
+            store_observation.append(next_obs)
+            init_cnt += 1
+            if init_cnt == init_steps_obs_std:
+                break
+            if done:
+                break
+        if init_cnt == init_steps_obs_std:
+            break
+    obs_std = np.std(store_observation, 0)
+    #TODO check whether we should add init_steps_obs_std to the total number of timestamps
+
     # Prepare for interaction with environment
     start_time = time.time()
     o, ep_ret, ep_len = env.reset(), 0, 0
@@ -319,22 +341,14 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
 
             next_o, r, d, _ = env.step(a)
 
-            true_r = r
-            if reward_eng:
-                next_state = np.reshape(next_o, (1, 2))
-                state = np.reshape(o, (1, 2))
+            # Calculate intrinsic reward
+            r_i = random.random() #TODO fix me
 
-                # Customised reward function mountain car
-                extra_r = 100*((math.sin(3 * next_state[0, 0]) * 0.0025 + 0.5 * next_state[0, 1] * next_state[0, 1]) -
-                           (math.sin(3 * state[0, 0]) * 0.0025 + 0.5 * state[0, 1] * state[0, 1]))
-                #print(f"Real Reward:{r} | Extra reward:{extra_r} | Total:{r + extra_r}")
-                r = extra_r
-
-            ep_ret += true_r
+            ep_ret += r
             ep_len += 1
 
             # save and log
-            buf.store(o, a, r, v, logp)
+            buf.store(o, a, r, r_i, v, logp)
             logger.store(VVals=v)
 
             # Update obs (critical!)
@@ -398,6 +412,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', '-s', type=int, default=2)  # 2
     parser.add_argument('--cpu', type=int, default=4)  # 4
     parser.add_argument('--steps', type=int, default=4000)  # 4000
+    parser.add_argument('--init_steps_obs_std', type=int, default=1000)
     parser.add_argument('--epochs', type=int, default=200)  # 2500
     parser.add_argument('--exp_name', type=str, default='rnd')
     parser.add_argument('--polyak', type=float, default=0.95)
@@ -428,5 +443,5 @@ if __name__ == '__main__':
         reward_eng=args.reward_engineering,
         gamma=args.gamma, clip_ratio=0.2, pi_lr=args.learning_rate, vf_lr=args.learning_rate,
         train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000,
-        target_kl=0.01, seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs,
-        logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
+        target_kl=0.01, seed=args.seed, init_steps_obs_std=args.init_steps_obs_std, steps_per_epoch=args.steps,
+        epochs=args.epochs, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)

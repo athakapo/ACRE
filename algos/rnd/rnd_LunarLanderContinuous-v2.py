@@ -15,6 +15,7 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=2)
     parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--init_steps_obs_std', type=int, default=1000)
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--exp_name', type=str, default='rnd')
     parser.add_argument('--cpu', type=int, default=4)  # 4
@@ -46,5 +47,5 @@ if __name__ == '__main__':
         ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
         gamma=args.gamma, clip_ratio=0.4, pi_lr=args.learning_rate, vf_lr=args.learning_rate,
         train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000,
-        target_kl=0.01, seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs,
-        logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
+        target_kl=0.01, seed=args.seed, init_steps_obs_std=args.init_steps_obs_std, steps_per_epoch=args.steps,
+        epochs=args.epochs, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
