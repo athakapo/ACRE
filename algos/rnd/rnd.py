@@ -20,19 +20,23 @@ class PPOBuffer:
     for calculating the advantages of state-action pairs.
     """
 
-    def __init__(self, obs_dim, act_dim, size, gamma=0.99, lam=0.95):
+    def __init__(self, obs_dim, act_dim, size, gamma=0.99, lam=0.95, w_i=0.1):
         self.obs_buf = np.zeros(core.combined_shape(size, obs_dim), dtype=np.float32)
         self.act_buf = np.zeros(core.combined_shape(size, act_dim), dtype=np.float32)
         self.adv_buf = np.zeros(size, dtype=np.float32)
+        self.adv_intr_buf = np.zeros(size, dtype=np.float32)
         self.rew_buf = np.zeros(size, dtype=np.float32)
         self.intr_buf = np.zeros(size, dtype=np.float32)
         self.ret_buf = np.zeros(size, dtype=np.float32)
+        self.ret_intr_buf = np.zeros(size, dtype=np.float32)
         self.val_buf = np.zeros(size, dtype=np.float32)
+        self.valintr_buf = np.zeros(size, dtype=np.float32)
         self.logp_buf = np.zeros(size, dtype=np.float32)
+        self.w_i = w_i
         self.gamma, self.lam = gamma, lam
         self.ptr, self.path_start_idx, self.max_size = 0, 0, size
 
-    def store(self, obs, act, rew, intr, val, logp):
+    def store(self, obs, act, rew, intr, val, valintr, logp):
         """
         Append one timestep of agent-environment interaction to the buffer.
         """
@@ -42,10 +46,11 @@ class PPOBuffer:
         self.rew_buf[self.ptr] = rew
         self.intr_buf[self.ptr] = intr
         self.val_buf[self.ptr] = val
+        self.valintr_buf[self.ptr] = valintr
         self.logp_buf[self.ptr] = logp
         self.ptr += 1
 
-    def finish_path(self, last_val=0):
+    def finish_path(self, last_val=0, last_val_intr=0):
         """
         Call this at the end of a trajectory, or when one gets cut off
         by an epoch ending. This looks back in the buffer to where the
@@ -61,16 +66,32 @@ class PPOBuffer:
         for timesteps beyond the arbitrary episode horizon (or epoch cutoff).
         """
 
+        # Define the slice
         path_slice = slice(self.path_start_idx, self.ptr)
+
+        # 1. Work for regular reward
+        # 1.1 recover rewards - vals
         rews = np.append(self.rew_buf[path_slice], last_val)
         vals = np.append(self.val_buf[path_slice], last_val)
 
-        # the next two lines implement GAE-Lambda advantage calculation
+        # 1.2 the next two lines implement GAE-Lambda advantage calculation
         deltas = rews[:-1] + self.gamma * vals[1:] - vals[:-1]
         self.adv_buf[path_slice] = core.discount_cumsum(deltas, self.gamma * self.lam)
 
-        # the next line computes rewards-to-go, to be targets for the value function
+        # 1.3 the next line computes rewards-to-go, to be targets for the value function
         self.ret_buf[path_slice] = core.discount_cumsum(rews, self.gamma)[:-1]
+
+        # 2. Work for intrinsic reward
+        # 2.1 recover rewards - vals
+        intrs = np.append(self.intr_buf[path_slice], last_val_intr)
+        valintr = np.append(self.valintr_buf[path_slice], last_val_intr)
+
+        # 2.2 the next two lines implement GAE-Lambda advantage calculation
+        deltas_intrs = intrs[:-1] + self.gamma * valintr[1:] - valintr[:-1]
+        self.adv_intr_buf[path_slice] = core.discount_cumsum(deltas_intrs, self.gamma * self.lam)
+
+        # 2.3 the next line computes rewards-to-go, to be targets for the intrinsic value estimation
+        self.ret_intr_buf[path_slice] = core.discount_cumsum(intrs, self.gamma)[:-1]
 
         self.path_start_idx = self.ptr
 
@@ -82,17 +103,34 @@ class PPOBuffer:
         """
         assert self.ptr == self.max_size  # buffer has to be full before you can get
         self.ptr, self.path_start_idx = 0, 0
-        # the next two lines implement the advantage normalization trick
-        adv_mean, adv_std = mpi_statistics_scalar(self.adv_buf)
-        self.adv_buf = (self.adv_buf - adv_mean) / adv_std
+
+        # Before combining the advantages let's normalize them first
+
+        # 1. Advantage for the problem at hand
+        self.adv_buf = self.normalize_ndarray(self.adv_buf)
+
+        # 2. Advantage for the exploration problem
+        self.adv_intr_buf = self.normalize_ndarray(self.adv_intr_buf)
+
+        # final advantage values
+        final_adv = self.adv_buf + self.w_i * self.adv_intr_buf
+
+        # normalize observation
+        self.obs_buf = self.normalize_ndarray(self.obs_buf)
+
         data = dict(obs=self.obs_buf, act=self.act_buf, ret=self.ret_buf,
-                    adv=self.adv_buf, logp=self.logp_buf)
+                    ret_intr=self.ret_intr_buf, adv=final_adv, logp=self.logp_buf)
         return {k: torch.as_tensor(v, dtype=torch.float32) for k, v in data.items()}
+
+    @staticmethod
+    def normalize_ndarray(array):
+        array_mean, array_std = mpi_statistics_scalar(array)
+        return (array- array_mean) / array_std
 
 
 def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=None,
         reward_eng=False, seed=0, init_steps_obs_std=1000, steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
-        vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000,
+        vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=0.1,
         target_kl=0.01, logger_kwargs=dict(), logger_tb_args=dict(), save_freq=10):
     """
     Random Network Distillation (by clipping),
@@ -242,7 +280,7 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
 
     # Set up experience buffer
     local_steps_per_epoch = steps_per_epoch  # int(steps_per_epoch / num_procs())
-    buf = PPOBuffer(obs_dim, act_dim, local_steps_per_epoch, gamma, lam)
+    buf = PPOBuffer(obs_dim, act_dim, local_steps_per_epoch, gamma, lam, w_i)
 
     # Set up function for computing PPO policy loss
     def compute_loss_pi(data):
@@ -338,6 +376,7 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
     for epoch in range(epochs):
         for t in range(local_steps_per_epoch):
             a, v, logp = ac.step(torch.as_tensor(o, dtype=torch.float32))
+            v_i = random.random() #TODO this should be retrieved from ac.step()
 
             next_o, r, d, _ = env.step(a)
 
@@ -348,7 +387,7 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
             ep_len += 1
 
             # save and log
-            buf.store(o, a, r, r_i, v, logp)
+            buf.store(o, a, r, r_i, v, v_i, logp)
             logger.store(VVals=v)
 
             # Update obs (critical!)
@@ -363,10 +402,12 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
                     print('Warning: trajectory cut off by epoch at %d steps.' % ep_len, flush=True)
                 # if trajectory didn't reach terminal state, bootstrap value target
                 if timeout or epoch_ended:
-                    _, v, _ = ac.step(torch.as_tensor(o, dtype=torch.float32))
+                    _, v, _ = ac.step(torch.as_tensor(o, dtype=torch.float32)) #TODO return also v_intrinsic
+                    v_i = random.random()  # TODO this should be retrieved from ac.step()
                 else:
                     v = 0
-                buf.finish_path(v)
+                    v_i = 0
+                buf.finish_path(v, v_i)
                 if terminal:
                     # only save EpRet / EpLen if trajectory finished
                     logger.store(EpRet=ep_ret, EpLen=ep_len)
