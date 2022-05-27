@@ -143,9 +143,13 @@ class RNDModel(nn.Module):
         for param in self.target.parameters():
             param.requires_grad = False
 
-    def forward(self, next_obs):
-        predict_feature = self.predictor(next_obs)
-        with torch.no_grad():
-            target_feature = self.target(next_obs)
+        # build value function
+        self.v_i = MLPCritic(obs_dim, hidden_sizes, activation)
 
-        return ((target_feature - predict_feature) ** 2).mean()
+    def step(self, obs):
+        with torch.no_grad():
+            predict_feature = self.predictor(obs)
+            target_feature = self.target(obs)
+            v = self.v_i(obs)
+
+        return np.asscalar((((target_feature - predict_feature) ** 2).mean()).numpy()), v.numpy()

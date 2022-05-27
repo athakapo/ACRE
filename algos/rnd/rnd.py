@@ -96,7 +96,7 @@ class PPOBuffer:
 
         self.path_start_idx = self.ptr
 
-    def get(self):
+    def get(self, obs_rms):
         """
         Call this at the end of an epoch to get all of the data from
         the buffer, with advantages appropriately normalized (shifted to have
@@ -117,9 +117,9 @@ class PPOBuffer:
         final_adv = self.adv_buf + self.w_i * self.adv_intr_buf
 
         # normalize observation
-        self.obs_buf = self.normalize_ndarray(self.obs_buf)
+        obs_normilized = obs_rms.normalize_me(self.obs_buf)
 
-        data = dict(obs=self.obs_buf, act=self.act_buf, ret=self.ret_buf,
+        data = dict(obs=self.obs_buf, obs_normal=obs_normilized, act=self.act_buf, ret=self.ret_buf,
                     ret_intr=self.ret_intr_buf, adv=final_adv, logp=self.logp_buf)
         return {k: torch.as_tensor(v, dtype=torch.float32) for k, v in data.items()}
 
@@ -128,11 +128,44 @@ class PPOBuffer:
         array_mean, array_std = mpi_statistics_scalar(array)
         return (array- array_mean) / array_std
 
+class RunningMeanStd(object):
+    # https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
+    def __init__(self, epsilon=1e-4, shape=(), clip_val=5):
+        self.mean = np.zeros(shape, 'float64')
+        self.var = np.ones(shape, 'float64')
+        self.count = epsilon
+        self.clip_val = clip_val
+
+    def update(self, x):
+        batch_mean = np.mean(x, axis=0)
+        batch_var = np.var(x, axis=0)
+        batch_count = x.shape[0]
+        self.update_from_moments(batch_mean, batch_var, batch_count)
+
+    def update_from_moments(self, batch_mean, batch_var, batch_count):
+        delta = batch_mean - self.mean
+        tot_count = self.count + batch_count
+
+        new_mean = self.mean + delta * batch_count / tot_count
+        m_a = self.var * (self.count)
+        m_b = batch_var * (batch_count)
+        M2 = m_a + m_b + np.square(delta) * self.count * batch_count / (self.count + batch_count)
+        new_var = M2 / (self.count + batch_count)
+
+        new_count = batch_count + self.count
+
+        self.mean = new_mean
+        self.var = new_var
+        self.count = new_count
+
+    def normalize_me(self, x):
+        return ((x - self.mean) / np.sqrt(self.var)).clip(-self.clip_val, self.clip_val)
+
 
 def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=None,
         reward_eng=False, seed=0, init_steps_obs_std=1000, steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
         vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=0.1, RNDoutput_size = 40, #TODO check me out
-        target_kl=0.01, logger_kwargs=dict(), logger_tb_args=dict(), save_freq=10):
+        clip_obs=5, target_kl=0.01, logger_kwargs=dict(), logger_tb_args=dict(), save_freq=10):
     """
     Random Network Distillation (by clipping),
 
@@ -276,7 +309,7 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
     sync_params(ac)
 
     # Create RND model
-    explore = RNDModel(obs_dim[0], RNDoutput_size)
+    explorer = RNDModel(obs_dim[0], RNDoutput_size)
 
     # Count variables
     var_counts = tuple(core.count_vars(module) for module in [ac.pi, ac.v])
@@ -285,6 +318,9 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
     # Set up experience buffer
     local_steps_per_epoch = steps_per_epoch  # int(steps_per_epoch / num_procs())
     buf = PPOBuffer(obs_dim, act_dim, local_steps_per_epoch, gamma, lam, w_i)
+
+    reward_rms = RunningMeanStd()
+    obs_rms = RunningMeanStd(shape=env.observation_space.shape, clip_val=clip_obs)
 
     # Set up function for computing PPO policy loss
     def compute_loss_pi(data):
@@ -310,15 +346,32 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
         obs, ret = data['obs'], data['ret']
         return ((ac.v(obs) - ret) ** 2).mean()
 
+    # Set up function for computing curiosity-driven (Random Network Distillation) value loss
+    def compute_loss_v_i(data):
+        obs_normal, ret_intr = data['obs_normal'], data['ret_intr']
+        return ((explorer.v_i(obs_normal) - ret_intr) ** 2).mean()
+
+    # Set up function for computing curiosity-driven (Random Network Distillation) predictor loss
+    def compute_loss_predictor(data):
+        obs_normal = data['obs_normal']
+        with torch.no_grad():
+            targets = explorer.target(obs_normal)
+
+        return ((explorer.predictor(obs_normal) - targets) ** 2).mean()
+
     # Set up optimizers for policy and value function
     pi_optimizer = Adam(ac.pi.parameters(), lr=pi_lr)
     vf_optimizer = Adam(ac.v.parameters(), lr=vf_lr)
+
+    # Set up optimizers for explorer's networks
+    predictor_optimizer = Adam(explorer.predictor.parameters(), lr=vf_lr)
+    v_i_f_optimizer = Adam(explorer.v_i.parameters(), lr=vf_lr)
 
     # Set up model saving
     logger.setup_pytorch_saver(ac)
 
     def update():
-        data = buf.get()
+        data = buf.get(obs_rms)
 
         pi_l_old, pi_info_old = compute_loss_pi(data)
         pi_l_old = pi_l_old.item()
@@ -346,6 +399,23 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
             mpi_avg_grads(ac.v)  # average grads across MPI processes
             vf_optimizer.step()
 
+        # Explorer Predictor function learning
+        for i in range(train_v_iters):
+            predictor_optimizer.zero_grad()
+            loss_predictor = compute_loss_predictor(data)
+            loss_predictor.backward()
+            mpi_avg_grads(explorer.predictor)  # average grads across MPI processes
+            predictor_optimizer.step()
+
+
+        # Explorer Value function learning
+        for i in range(train_v_iters):
+            v_i_f_optimizer.zero_grad()
+            loss_v_i = compute_loss_v_i(data)
+            loss_v_i.backward()
+            mpi_avg_grads(explorer.v_i)  # average grads across MPI processes
+            v_i_f_optimizer.step()
+
         # Log changes from update
         kl, ent, cf = pi_info['kl'], pi_info_old['ent'], pi_info['cf']
         logger.store(LossPi=pi_l_old, LossV=v_l_old,
@@ -353,23 +423,25 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
                      DeltaLossPi=(loss_pi.item() - pi_l_old),
                      DeltaLossV=(loss_v.item() - v_l_old))
 
+
     """ calculate initial observation std """
     store_observation = []
     init_cnt = 0
     while True:
-        env.reset()
+        obs = env.reset()
         while True:  # observation normalize
+            obs_rms.update(np.stack(obs))
             action = env.action_space.sample()  # uniform random action.
-            next_obs, _, done, _ = env.step(action)
-            store_observation.append(next_obs)
+            obs, _, done, _ = env.step(action)
             init_cnt += 1
             if init_cnt == init_steps_obs_std:
+                obs_rms.update(np.stack(obs))
                 break
             if done:
+                obs_rms.update(np.stack(obs))
                 break
         if init_cnt == init_steps_obs_std:
             break
-    obs_std = np.std(store_observation, 0)
     #TODO check whether we should add init_steps_obs_std to the total number of timestamps
 
     # Prepare for interaction with environment
@@ -380,10 +452,12 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
     for epoch in range(epochs):
         for t in range(local_steps_per_epoch):
             a, v, logp = ac.step(torch.as_tensor(o, dtype=torch.float32))
-            v_i = random.random() #TODO this should be retrieved from ac.step()
 
             # Calculate intrinsic reward
-            r_i = explore(torch.as_tensor(o, dtype=torch.float32))
+            r_i, v_i = explorer.step(torch.as_tensor(obs_rms.normalize_me(o), dtype=torch.float32))
+
+            # update obs normalize param
+            obs_rms.update(o)
 
             next_o, r, d, _ = env.step(a)
 
@@ -406,8 +480,8 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
                     print('Warning: trajectory cut off by epoch at %d steps.' % ep_len, flush=True)
                 # if trajectory didn't reach terminal state, bootstrap value target
                 if timeout or epoch_ended:
-                    _, v, _ = ac.step(torch.as_tensor(o, dtype=torch.float32)) #TODO return also v_intrinsic
-                    v_i = random.random()  # TODO this should be retrieved from ac.step()
+                    _, v, _ = ac.step(torch.as_tensor(o, dtype=torch.float32))
+                    _, v_i = explorer.step(torch.as_tensor(obs_rms.normalize_me(o), dtype=torch.float32))
                 else:
                     v = 0
                     v_i = 0
@@ -417,6 +491,8 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
                     logger.store(EpRet=ep_ret, EpLen=ep_len)
                     if logger_tb_args['enable']:
                         logger_tb.update_tensorboard(ep_ret, ep_len)
+                # update obs normalize param
+                obs_rms.update(next_o)
                 o, ep_ret, ep_len = env.reset(), 0, 0
 
         # Save model
@@ -448,17 +524,17 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='MountainCar-v0')  # LunarLanderContinuous-v2
+    parser.add_argument('--env', type=str, default='MountainCarContinuous-v0')  # LunarLanderContinuous-v2
     parser.add_argument('--reward_type', type=str, default=None)  # None
     parser.add_argument('--reward_engineering', type=bool, default=False)  # None
     parser.add_argument('--hid', type=int, default=256)  # 64
     parser.add_argument('--l', type=int, default=2)  # 2
     parser.add_argument('--gamma', type=float, default=0.99)  # 0.99
-    parser.add_argument('--seed', '-s', type=int, default=2)  # 2
+    parser.add_argument('--seed', '-s', type=int, default=60)  # 2
     parser.add_argument('--cpu', type=int, default=4)  # 4
     parser.add_argument('--steps', type=int, default=4000)  # 4000
     parser.add_argument('--init_steps_obs_std', type=int, default=1000)
-    parser.add_argument('--epochs', type=int, default=200)  # 2500
+    parser.add_argument('--epochs', type=int, default=50)  # 2500
     parser.add_argument('--exp_name', type=str, default='rnd')
     parser.add_argument('--polyak', type=float, default=0.95)
     parser.add_argument('--learning_rate', type=float, default=1e-3)
