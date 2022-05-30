@@ -164,7 +164,7 @@ class RunningMeanStd(object):
 
 def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=None,
         reward_eng=False, seed=0, init_steps_obs_std=1000, steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
-        vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=0.1, RNDoutput_size = 40, #TODO check me out
+        vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=1.0, RNDoutput_size = 40, #TODO check me out
         clip_obs=5, target_kl=0.01, logger_kwargs=dict(), logger_tb_args=dict(), save_freq=10):
     """
     Random Network Distillation (by clipping),
@@ -377,6 +377,9 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
         pi_l_old = pi_l_old.item()
         v_l_old = compute_loss_v(data).item()
 
+        loss_predictor_old = compute_loss_predictor(data).item()
+        loss_v_i_old = compute_loss_v_i(data).item()
+
         # Train policy with multiple steps of gradient descent
         for i in range(train_pi_iters):
             pi_optimizer.zero_grad()
@@ -419,9 +422,13 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
         # Log changes from update
         kl, ent, cf = pi_info['kl'], pi_info_old['ent'], pi_info['cf']
         logger.store(LossPi=pi_l_old, LossV=v_l_old,
+                     RNDloss=loss_predictor_old,
+                     Vpredictor=loss_v_i_old,
                      KL=kl, Entropy=ent, ClipFrac=cf,
                      DeltaLossPi=(loss_pi.item() - pi_l_old),
-                     DeltaLossV=(loss_v.item() - v_l_old))
+                     DeltaLossV=(loss_v.item() - v_l_old),
+                     DeltaLossRND=(loss_predictor.item() -loss_predictor_old),
+                     DeltaLossVi=(loss_v_i.item() - loss_v_i_old))
 
 
     """ calculate initial observation std """
@@ -512,6 +519,10 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
         logger.log_tabular('LossV', average_only=True)
         logger.log_tabular('DeltaLossPi', average_only=True)
         logger.log_tabular('DeltaLossV', average_only=True)
+        logger.log_tabular('RNDloss', average_only=True)
+        logger.log_tabular('Vpredictor', average_only=True)
+        logger.log_tabular('DeltaLossRND', average_only=True)
+        logger.log_tabular('DeltaLossVi', average_only=True)
         logger.log_tabular('Entropy', average_only=True)
         logger.log_tabular('KL', average_only=True)
         logger.log_tabular('ClipFrac', average_only=True)
@@ -524,9 +535,8 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='MountainCarContinuous-v0')  # LunarLanderContinuous-v2
+    parser.add_argument('--env', type=str, default='Swimmer-v2')  # LunarLanderContinuous-v2
     parser.add_argument('--reward_type', type=str, default=None)  # None
-    parser.add_argument('--reward_engineering', type=bool, default=False)  # None
     parser.add_argument('--hid', type=int, default=256)  # 64
     parser.add_argument('--l', type=int, default=2)  # 2
     parser.add_argument('--gamma', type=float, default=0.99)  # 0.99
@@ -534,7 +544,7 @@ if __name__ == '__main__':
     parser.add_argument('--cpu', type=int, default=4)  # 4
     parser.add_argument('--steps', type=int, default=4000)  # 4000
     parser.add_argument('--init_steps_obs_std', type=int, default=1000)
-    parser.add_argument('--epochs', type=int, default=50)  # 2500
+    parser.add_argument('--epochs', type=int, default=80)  # 2500
     parser.add_argument('--exp_name', type=str, default='rnd')
     parser.add_argument('--polyak', type=float, default=0.95)
     parser.add_argument('--learning_rate', type=float, default=1e-3)
@@ -552,16 +562,14 @@ if __name__ == '__main__':
     logger_tb_args['enable'] = args.tensorboard
     if args.tensorboard:
         if args.reward_type is not None:
-            instance_details = f"{args.env}-RT{args.reward_type}-{args.exp_name}-[{args.l}_{args.hid}]" \
-                               f"-RE{args.reward_engineering}"
+            instance_details = f"{args.env}-RT{args.reward_type}-{args.exp_name}-[{args.l}_{args.hid}]"
         else:
-            instance_details = f"{args.env}-{args.exp_name}-[{args.l}_{args.hid}]-RE{args.reward_engineering}"
+            instance_details = f"{args.env}-{args.exp_name}-[{args.l}_{args.hid}]"
         logger_tb_args['instance_details'] = instance_details
         logger_tb_args['aggregate_stats'] = args.aggregate_stats
 
     rnd(lambda: gym.make(args.env), actor_critic=core.MLPActorCritic,
         ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
-        reward_eng=args.reward_engineering,
         gamma=args.gamma, clip_ratio=0.2, pi_lr=args.learning_rate, vf_lr=args.learning_rate,
         train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000,
         target_kl=0.01, seed=args.seed, init_steps_obs_std=args.init_steps_obs_std, steps_per_epoch=args.steps,
