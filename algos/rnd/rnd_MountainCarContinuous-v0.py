@@ -8,14 +8,14 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='LunarLanderContinuous-v2')
+    parser.add_argument('--env', type=str, default='MountainCarContinuous-v0')
     parser.add_argument('--reward_type', type=str, default=None)  # None
     parser.add_argument('--hid', type=int, default=256)
     parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--seed', '-s', type=int, default=2)
-    parser.add_argument('--w_i', type=float, default=1.0)
+    parser.add_argument('--seed', '-s', type=int, default=60)
     parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--w_i', type=float, default=1.0)
     parser.add_argument('--init_steps_obs_std', type=int, default=1000)
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--exp_name', type=str, default='rnd')

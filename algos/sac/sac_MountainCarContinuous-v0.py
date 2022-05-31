@@ -16,7 +16,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--alpha', type=int, default=1)
     parser.add_argument('--exp_name', type=str, default='sac')
-    parser.add_argument('--tensorboard', type=bool, default=False)
+    parser.add_argument('--tensorboard', type=bool, default=True)
     parser.add_argument('--aggregate_stats', type=int, default=100)
     args = parser.parse_args()
 

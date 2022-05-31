@@ -152,4 +152,4 @@ class RNDModel(nn.Module):
             target_feature = self.target(obs)
             v = self.v_i(obs)
 
-        return np.asscalar((((target_feature - predict_feature) ** 2).mean()).numpy()), v.numpy()
+        return ((target_feature - predict_feature) ** 2).numpy().mean(), v.numpy()

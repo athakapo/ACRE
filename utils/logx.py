@@ -321,6 +321,7 @@ class TensorBoardLogger():
             print("Successfully created the directory %s" % self.tensorboard_path)
         self.tensorboard = ModifiedTensorBoard(log_dir=self.tensorboard_path)
         self.total_rewards = []
+        self.total_intrinsic_return = []
         self.total_new_returns = []
         self.episode_id = 0
 
@@ -339,6 +340,54 @@ class TensorBoardLogger():
         std_reward = np.std(self.total_rewards[-self.aggregate_stats_every:])
         self.tensorboard.update_stats(Average_return=average_reward, Min_return=min_reward, Max_return=max_reward,
                                       STD_return=std_reward)
+
+        # Performance on the learnt reward
+        if learnt_ep_return is not None:
+            self.total_new_returns.append((learnt_ep_return))
+            self.tensorboard.update_stats(Learnt_episode_return=learnt_ep_return)
+            average_learnt_reward = sum(self.total_new_returns[-self.aggregate_stats_every:]) / len(
+                self.total_new_returns[-self.aggregate_stats_every:])
+            learnt_min_reward = min(self.total_new_returns[-self.aggregate_stats_every:])
+            learnt_max_reward = max(self.total_new_returns[-self.aggregate_stats_every:])
+            learnt_std_reward = np.std(self.total_new_returns[-self.aggregate_stats_every:])/learnt_max_reward
+            self.tensorboard.update_stats(Learnt_average_return=average_learnt_reward, Learnt_Min_return=learnt_min_reward,
+                                          Learnt_Max_return=learnt_max_reward, Learnt_STD_return=learnt_std_reward)
+
+
+        average_reward = sum(self.total_rewards[-self.aggregate_stats_every:]) / len(self.total_rewards[-self.aggregate_stats_every:])
+        min_reward = min(self.total_rewards[-self.aggregate_stats_every:])
+        max_reward = max(self.total_rewards[-self.aggregate_stats_every:])
+        std_reward = np.std(self.total_rewards[-self.aggregate_stats_every:])
+        self.tensorboard.update_stats(Average_return=average_reward, Min_return=min_reward, Max_return=max_reward,
+                                      STD_return=std_reward)
+
+    def update_tensorboard_rnd(self, episode_reward, timesteps, intr_ret, learnt_ep_return=None):
+        self.episode_id += timesteps
+        self.tensorboard.step = self.episode_id
+
+        # Append episode reward to a list and log stats (every given number of episodes)
+        self.total_rewards.append(episode_reward)
+        self.tensorboard.update_stats(Return=episode_reward)
+
+        average_reward = sum(self.total_rewards[-self.aggregate_stats_every:]) / len(
+            self.total_rewards[-self.aggregate_stats_every:])
+        min_reward = min(self.total_rewards[-self.aggregate_stats_every:])
+        max_reward = max(self.total_rewards[-self.aggregate_stats_every:])
+        std_reward = np.std(self.total_rewards[-self.aggregate_stats_every:])
+        self.tensorboard.update_stats(Average_return=average_reward, Min_return=min_reward, Max_return=max_reward,
+                                      STD_return=std_reward)
+
+        # Add intrinsic return to the stats
+        self.total_intrinsic_return.append(intr_ret)
+        self.tensorboard.update_stats(Intrinsic_Reward=intr_ret)
+
+        average_intr_ret = sum(self.total_intrinsic_return[-self.aggregate_stats_every:]) / len(
+            self.total_intrinsic_return[-self.aggregate_stats_every:])
+        min_intr_ret = min(self.total_intrinsic_return[-self.aggregate_stats_every:])
+        max_intr_ret = max(self.total_intrinsic_return[-self.aggregate_stats_every:])
+        std_intr_ret = np.std(self.total_intrinsic_return[-self.aggregate_stats_every:])
+        self.tensorboard.update_stats(Average_Intrinsic_Reward=average_intr_ret, Min_Intrinsic_Reward=min_intr_ret,
+                                      Max_Intrinsic_Reward=max_intr_ret, STD_Intrinsic_Reward=std_intr_ret)
 
         # Performance on the learnt reward
         if learnt_ep_return is not None:

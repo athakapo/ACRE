@@ -164,7 +164,7 @@ class RunningMeanStd(object):
 
 def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=None,
         reward_eng=False, seed=0, init_steps_obs_std=1000, steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
-        vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=1.0, RNDoutput_size = 40, #TODO check me out
+        vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=1.0, RNDoutput_size = 4, #TODO check me out
         clip_obs=5, target_kl=0.01, logger_kwargs=dict(), logger_tb_args=dict(), save_freq=10):
     """
     Random Network Distillation (by clipping),
@@ -453,7 +453,7 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
 
     # Prepare for interaction with environment
     start_time = time.time()
-    o, ep_ret, ep_len = env.reset(), 0, 0
+    o, ep_ret, ep_len, intr_ret = env.reset(), 0, 0, 0
 
     # Main loop: collect experience in env and update/log each epoch
     for epoch in range(epochs):
@@ -470,6 +470,7 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
 
             ep_ret += r
             ep_len += 1
+            intr_ret += r_i
 
             # save and log
             buf.store(o, a, r, r_i, v, v_i, logp)
@@ -497,10 +498,10 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
                     # only save EpRet / EpLen if trajectory finished
                     logger.store(EpRet=ep_ret, EpLen=ep_len)
                     if logger_tb_args['enable']:
-                        logger_tb.update_tensorboard(ep_ret, ep_len)
+                        logger_tb.update_tensorboard_rnd(ep_ret, ep_len, intr_ret)
                 # update obs normalize param
                 obs_rms.update(next_o)
-                o, ep_ret, ep_len = env.reset(), 0, 0
+                o, ep_ret, ep_len, intr_ret = env.reset(), 0, 0, 0
 
         # Save model
         if (epoch % save_freq == 0) or (epoch == epochs - 1):
@@ -535,11 +536,12 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='Swimmer-v2')  # LunarLanderContinuous-v2
+    parser.add_argument('--env', type=str, default='MountainCarContinuous-v0')  # LunarLanderContinuous-v2, Swimmer-v2, MountainCarContinuous-v0
     parser.add_argument('--reward_type', type=str, default=None)  # None
     parser.add_argument('--hid', type=int, default=256)  # 64
     parser.add_argument('--l', type=int, default=2)  # 2
     parser.add_argument('--gamma', type=float, default=0.99)  # 0.99
+    parser.add_argument('--w_i', type=float, default=1.0)
     parser.add_argument('--seed', '-s', type=int, default=60)  # 2
     parser.add_argument('--cpu', type=int, default=4)  # 4
     parser.add_argument('--steps', type=int, default=4000)  # 4000
@@ -562,15 +564,15 @@ if __name__ == '__main__':
     logger_tb_args['enable'] = args.tensorboard
     if args.tensorboard:
         if args.reward_type is not None:
-            instance_details = f"{args.env}-RT{args.reward_type}-{args.exp_name}-[{args.l}_{args.hid}]"
+            instance_details = f"{args.env}-RT{args.reward_type}-{args.exp_name}-[{args.l}_{args.hid}]-wi_{args.w_i}"
         else:
-            instance_details = f"{args.env}-{args.exp_name}-[{args.l}_{args.hid}]"
+            instance_details = f"{args.env}-{args.exp_name}-[{args.l}_{args.hid}]-wi_{args.w_i}"
         logger_tb_args['instance_details'] = instance_details
         logger_tb_args['aggregate_stats'] = args.aggregate_stats
 
     rnd(lambda: gym.make(args.env), actor_critic=core.MLPActorCritic,
         ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
         gamma=args.gamma, clip_ratio=0.2, pi_lr=args.learning_rate, vf_lr=args.learning_rate,
-        train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000,
+        train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=args.w_i,
         target_kl=0.01, seed=args.seed, init_steps_obs_std=args.init_steps_obs_std, steps_per_epoch=args.steps,
         epochs=args.epochs, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
