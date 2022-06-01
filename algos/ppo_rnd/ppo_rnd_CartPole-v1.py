@@ -8,7 +8,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='MountainCarContinuous-v0')
+    parser.add_argument('--env', type=str, default='CartPole-v1')
     parser.add_argument('--reward_type', type=str, default=None)  # None
     parser.add_argument('--hid', type=int, default=256)
     parser.add_argument('--l', type=int, default=2)

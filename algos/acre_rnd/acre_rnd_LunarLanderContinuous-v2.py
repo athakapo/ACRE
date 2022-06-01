@@ -14,7 +14,8 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=60)
     parser.add_argument('--epochs', type=int, default=30)
-    parser.add_argument('--beta', type=float, default=1000.0)
+    parser.add_argument('--beta', type=float, default=0.01)
+    parser.add_argument('--RNDoutput_size', type=int, default=64)
     parser.add_argument('--estimate_rnd_every', type=int, default=1)
     parser.add_argument('--exp_name', type=str, default='acre_rnd')
     parser.add_argument('--tensorboard', type=bool, default=True)
@@ -40,5 +41,5 @@ if __name__ == '__main__':
     acre_rnd(lambda: gym.make(args.env), actor_critic=core.MLPActorCritic,
              ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
              gamma=args.gamma, seed=args.seed, epochs=args.epochs, beta=args.beta,
-             estimate_rnd_every=args.estimate_rnd_every,
+             estimate_rnd_every=args.estimate_rnd_every, RNDoutput_size=args.RNDoutput_size,
              logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)

@@ -103,6 +103,7 @@ class MLPVFunction(nn.Module):
     def forward(self, obs):
         return torch.squeeze(self.v_net(obs), -1) # Critical to ensure v has right shape.
 
+
 class MLPActorCritic(nn.Module):
 
     def __init__(self, observation_space, action_space, hidden_sizes=(256,256),
@@ -118,7 +119,7 @@ class MLPActorCritic(nn.Module):
         self.q1 = MLPQFunction(obs_dim, act_dim, hidden_sizes, activation)
         self.q2 = MLPQFunction(obs_dim, act_dim, hidden_sizes, activation)
 
-        # kde to assess information gain
+        # RND v to assess cummulative information gain
         self.v_rnd = MLPVFunction(obs_dim, hidden_sizes, activation)
 
         self.obs_dim = obs_dim
@@ -137,19 +138,10 @@ class MLPActorCritic(nn.Module):
             v_kde = self.v_kde(o)
             return v_kde.numpy()
 
-class MLPCritic(nn.Module):
-
-    def __init__(self, obs_dim, hidden_sizes, activation):
-        super().__init__()
-        self.v_net = mlp([obs_dim] + list(hidden_sizes) + [1], activation)
-
-    def forward(self, obs):
-        return torch.squeeze(self.v_net(obs), -1)  # Critical to ensure v has right shape.
-
 
 class RNDModel(nn.Module):
     def __init__(self, obs_dim, output_size,
-                 hidden_sizes=(64, 64), activation=nn.Tanh):
+                 hidden_sizes=(256, 256), activation=nn.Tanh):
         super().__init__()
 
         self.target = mlp([obs_dim] + list(hidden_sizes) + [output_size], activation)
@@ -158,13 +150,10 @@ class RNDModel(nn.Module):
         for param in self.target.parameters():
             param.requires_grad = False
 
-        # build value function
-        self.v_i = MLPCritic(obs_dim, hidden_sizes, activation)
 
     def step(self, obs):
         with torch.no_grad():
             predict_feature = self.predictor(obs)
             target_feature = self.target(obs)
-            v = self.v_i(obs)
 
-        return np.mean(((target_feature - predict_feature) ** 2).numpy(), axis=1), v.numpy()
+        return np.mean(((target_feature - predict_feature) ** 2).numpy(), axis=1)

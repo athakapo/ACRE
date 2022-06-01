@@ -36,7 +36,7 @@ class InfoBuffer:
             info_states = np.array(episode_obs)
             info_states = obs_rms.normalize_me(info_states)
             # Utilize RND estimation to calculate information gain of being at each state
-            episode_rewards, _ = explorer.step(torch.as_tensor(info_states, dtype=torch.float32))
+            episode_rewards = explorer.step(torch.as_tensor(info_states, dtype=torch.float32))
 
             # the next line computes rewards-to-go, to be targets for the value function
             episode_returns = core.discount_cumsum(episode_rewards, self.gamma)
@@ -164,7 +164,7 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
              polyak=0.995, lr=1e-3, beta=0.1, batch_size=100, start_steps=10000, mult_rnd_samples=3,
              update_after=1000, update_every=50, num_test_episodes=10, max_ep_len=1000,
              train_v_iters=80, estimate_rnd_every=5, logger_kwargs=dict(),
-             logger_tb_args=dict(), save_freq=10, RNDoutput_size=4, clip_obs=5):
+             logger_tb_args=dict(), save_freq=10, RNDoutput_size=40, clip_obs=5):
     """
     Actor-Critic with Reward-Preserving Exploration (ACRE)
 
@@ -352,7 +352,6 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
 
             rnd_next = ac.v_rnd(o2)
             backup = r + gamma * (1 - d) * (q_pi_targ + beta * rnd_next)
-
 
 
         # MSE loss against Bellman backup
@@ -624,7 +623,8 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=60)
     parser.add_argument('--epochs', type=int, default=30)
-    parser.add_argument('--beta', type=float, default=100.0)
+    parser.add_argument('--beta', type=float, default=0.001)
+    parser.add_argument('--RNDoutput_size', type=int, default=4)
     parser.add_argument('--estimate_rnd_every', type=int, default=1)
     parser.add_argument('--exp_name', type=str, default='acre_rnd')
     parser.add_argument('--tensorboard', type=bool, default=True)
@@ -650,5 +650,5 @@ if __name__ == '__main__':
     acre_rnd(lambda: gym.make(args.env), actor_critic=core.MLPActorCritic,
              ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
              gamma=args.gamma, seed=args.seed, epochs=args.epochs, beta=args.beta,
-             estimate_rnd_every=args.estimate_rnd_every,
+             estimate_rnd_every=args.estimate_rnd_every, RNDoutput_size=args.RNDoutput_size,
              logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)

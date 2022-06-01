@@ -14,7 +14,8 @@ if __name__ == '__main__':
     parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=2)
-    parser.add_argument('--w_i', type=float, default=1.0)
+    parser.add_argument('--w_i', type=float, default=0.1)
+    parser.add_argument('--RNDoutput_size', type=int, default=4)
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--init_steps_obs_std', type=int, default=1000)
     parser.add_argument('--batch_size', type=int, default=100)
@@ -36,17 +37,19 @@ if __name__ == '__main__':
     logger_tb_args['enable'] = args.tensorboard
     if args.tensorboard:
         if args.reward_type is not None:
-            instance_details = f"{args.env}-RT{args.reward_type}-{args.exp_name}-[{args.l}_{args.hid}]-wi_{args.w_i}"
+            instance_details = f"{args.env}-RT{args.reward_type}-{args.exp_name}-[{args.l}_{args.hid}]-" \
+                               f"wi_{args.w_i}-RNDoutput_{args.RNDoutput_size}"
         else:
-            instance_details = f"{args.env}-{args.exp_name}-[{args.l}_{args.hid}]-wi_{args.w_i}"
+            instance_details = f"{args.env}-{args.exp_name}-[{args.l}_{args.hid}]-" \
+                               f"wi_{args.w_i}-RNDoutput_{args.RNDoutput_size}"
         logger_tb_args['instance_details'] = instance_details
         logger_tb_args['aggregate_stats'] = args.aggregate_stats
-
     torch.set_num_threads(torch.get_num_threads())
 
     ppo_rnd(lambda: gym.make(args.env), actor_critic=core.MLPActorCritic,
-        ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
-        gamma=args.gamma, clip_ratio=0.4, pi_lr=args.learning_rate, vf_lr=args.learning_rate,
-        train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=args.w_i,
-        target_kl=0.01, seed=args.seed, init_steps_obs_std=args.init_steps_obs_std, steps_per_epoch=args.steps,
-        epochs=args.epochs, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
+            ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
+            gamma=args.gamma, clip_ratio=0.4, pi_lr=args.learning_rate, vf_lr=args.learning_rate,
+            train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=args.w_i,
+            target_kl=0.01, seed=args.seed, init_steps_obs_std=args.init_steps_obs_std, steps_per_epoch=args.steps,
+            RNDoutput_size=args.RNDoutput_size, epochs=args.epochs, logger_kwargs=logger_kwargs,
+            logger_tb_args=logger_tb_args)

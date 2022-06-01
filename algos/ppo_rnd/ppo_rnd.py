@@ -165,7 +165,7 @@ class RunningMeanStd(object):
 
 def ppo_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=None,
         reward_eng=False, seed=0, init_steps_obs_std=1000, steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
-        vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=1.0, RNDoutput_size = 4, #TODO check me out
+        vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=1.0, RNDoutput_size = 40, #TODO check me out
         clip_obs=5, target_kl=0.01, logger_kwargs=dict(), logger_tb_args=dict(), save_freq=10):
     """
     Random Network Distillation (by clipping),
@@ -535,7 +535,8 @@ if __name__ == '__main__':
     parser.add_argument('--hid', type=int, default=256)  # 64
     parser.add_argument('--l', type=int, default=2)  # 2
     parser.add_argument('--gamma', type=float, default=0.99)  # 0.99
-    parser.add_argument('--w_i', type=float, default=1.0)
+    parser.add_argument('--w_i', type=float, default=0.5)
+    parser.add_argument('--RNDoutput_size', type=int, default=4)
     parser.add_argument('--seed', '-s', type=int, default=60)  # 2
     parser.add_argument('--cpu', type=int, default=4)  # 4
     parser.add_argument('--steps', type=int, default=4000)  # 4000
@@ -558,9 +559,11 @@ if __name__ == '__main__':
     logger_tb_args['enable'] = args.tensorboard
     if args.tensorboard:
         if args.reward_type is not None:
-            instance_details = f"{args.env}-RT{args.reward_type}-{args.exp_name}-[{args.l}_{args.hid}]-wi_{args.w_i}"
+            instance_details = f"{args.env}-RT{args.reward_type}-{args.exp_name}-[{args.l}_{args.hid}]-" \
+                               f"wi_{args.w_i}-RNDoutput_{args.RNDoutput_size}"
         else:
-            instance_details = f"{args.env}-{args.exp_name}-[{args.l}_{args.hid}]-wi_{args.w_i}"
+            instance_details = f"{args.env}-{args.exp_name}-[{args.l}_{args.hid}]-" \
+                               f"wi_{args.w_i}-RNDoutput_{args.RNDoutput_size}"
         logger_tb_args['instance_details'] = instance_details
         logger_tb_args['aggregate_stats'] = args.aggregate_stats
 
@@ -569,4 +572,4 @@ if __name__ == '__main__':
         gamma=args.gamma, clip_ratio=0.2, pi_lr=args.learning_rate, vf_lr=args.learning_rate,
         train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=args.w_i,
         target_kl=0.01, seed=args.seed, init_steps_obs_std=args.init_steps_obs_std, steps_per_epoch=args.steps,
-        epochs=args.epochs, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
+        RNDoutput_size=args.RNDoutput_size, epochs=args.epochs, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
