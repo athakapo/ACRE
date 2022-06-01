@@ -512,6 +512,7 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
                 gmm_estimation = time.time()
                 # Update data over which the GMM estimation is going to take place
                 num_data_gmm = min(t, mult_gmm_samples * steps_per_epoch)
+                num_data_gmm = min(t, 1000) #TODO check if this is enough
                 if q_powered_gmm:
                     #states_buf = replay_buffer.get_last_aug_states(num_data_gmm)
                     states_buf = replay_buffer.get_random_aug_states(num_data_gmm)

@@ -156,4 +156,4 @@ class RNDModel(nn.Module):
             predict_feature = self.predictor(obs)
             target_feature = self.target(obs)
 
-        return np.mean(((target_feature - predict_feature) ** 2).numpy(), axis=1)
+        return np.mean(((target_feature - predict_feature) ** 2).numpy(), axis=1) #np.mean(((target_feature - predict_feature) ** 2).numpy(), axis=1)

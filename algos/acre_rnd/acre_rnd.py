@@ -402,13 +402,13 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
     # Set up model saving
     logger.setup_pytorch_saver(ac)
 
-    def update_rnd_net(data):
-        rnd_l_old = compute_loss_rnd_ret(data).item()
+    def update_rnd_net(data_rnd):
+        rnd_l_old = compute_loss_rnd_ret(data_rnd).item()
 
         # Info Value function learning
         for i in range(train_v_iters):
             rnd_optimizer.zero_grad()
-            loss_rnd = compute_loss_rnd_ret(data)
+            loss_rnd = compute_loss_rnd_ret(data_rnd)
             loss_rnd.backward()
             # mpi_avg_grads(ac.q_rnd)  # average grads across MPI processes
             rnd_optimizer.step()
@@ -504,6 +504,8 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
 
         # update obs normalize param
         obs_rms.update(o)
+        # print(f'Current exploration penalty: '
+        #       f'{explorer.step(torch.as_tensor(obs_rms.normalize_me(o), dtype=torch.float32).unsqueeze(0))}')
 
         # Step the env
         o2, r, d, _ = env.step(a)
@@ -545,7 +547,7 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
                 rnd_estimation = time.time()
                 # Update data over which the RND estimation is going to take place
                 num_data_rnd = min(t, mult_rnd_samples * steps_per_epoch)
-
+                num_data_rnd = 500
                 #states_buf = replay_buffer.get_last_states(num_data_rnd)
                 states_buf = replay_buffer.get_random_states(num_data_rnd)
 
