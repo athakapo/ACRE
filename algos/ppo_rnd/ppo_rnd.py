@@ -6,9 +6,10 @@ import torch
 from torch.optim import Adam
 import gym
 import time
+import itertools
 
-from algos.rnd import core
-from algos.rnd.core import RNDModel
+from algos.ppo_rnd import core
+from algos.ppo_rnd.core import RNDModel
 from utils.logx import EpochLogger, TensorBoardLogger
 from utils.mpi_pytorch import setup_pytorch_for_mpi, sync_params, mpi_avg_grads
 from utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
@@ -162,7 +163,7 @@ class RunningMeanStd(object):
         return ((x - self.mean) / np.sqrt(self.var)).clip(-self.clip_val, self.clip_val)
 
 
-def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=None,
+def ppo_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=None,
         reward_eng=False, seed=0, init_steps_obs_std=1000, steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
         vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=1.0, RNDoutput_size = 4, #TODO check me out
         clip_obs=5, target_kl=0.01, logger_kwargs=dict(), logger_tb_args=dict(), save_freq=10):
@@ -312,8 +313,11 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
     explorer = RNDModel(obs_dim[0], RNDoutput_size)
 
     # Count variables
-    var_counts = tuple(core.count_vars(module) for module in [ac.pi, ac.v])
-    logger.log('\nNumber of parameters: \t pi: %d, \t v: %d\n' % var_counts)
+    var_counts = tuple(core.count_vars(module) for module in [ac.pi, ac.v_core, ac.v_ex, ac.v_in, explorer.predictor])
+    logger.log('\nNumber of parameters: \t pi: %d, \t v_core: %d, \t v_ex: %d, \t v_in: %d, \t predictor: %d\n' % var_counts)
+
+    # List of parameters for all V networks (save this for convenience)
+    v_params = itertools.chain(ac.v_core.parameters(), ac.v_ex.parameters(), ac.v_in.parameters())
 
     # Set up experience buffer
     local_steps_per_epoch = steps_per_epoch  # int(steps_per_epoch / num_procs())
@@ -343,8 +347,14 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
 
     # Set up function for computing value loss
     def compute_loss_v(data):
-        obs, ret = data['obs'], data['ret']
-        return ((ac.v(obs) - ret) ** 2).mean()
+        obs, ret_ex, ret_intr = data['obs'], data['ret'], data['ret_intr']
+
+        v_core = ac.v_core(obs)
+        loss_v_ex = ((ac.v_ex(v_core) - ret_ex) ** 2).mean()
+        loss_v_in = ((ac.v_in(v_core) - ret_intr) ** 2).mean() # computing curiosity-driven (Random Network Distillation) value loss
+        loss_v = loss_v_ex + loss_v_in
+
+        return loss_v
 
     # Set up function for computing curiosity-driven (Random Network Distillation) value loss
     def compute_loss_v_i(data):
@@ -361,11 +371,10 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
 
     # Set up optimizers for policy and value function
     pi_optimizer = Adam(ac.pi.parameters(), lr=pi_lr)
-    vf_optimizer = Adam(ac.v.parameters(), lr=vf_lr)
+    vf_optimizer = Adam(v_params, lr=vf_lr)
 
     # Set up optimizers for explorer's networks
     predictor_optimizer = Adam(explorer.predictor.parameters(), lr=vf_lr)
-    v_i_f_optimizer = Adam(explorer.v_i.parameters(), lr=vf_lr)
 
     # Set up model saving
     logger.setup_pytorch_saver(ac)
@@ -378,7 +387,6 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
         v_l_old = compute_loss_v(data).item()
 
         loss_predictor_old = compute_loss_predictor(data).item()
-        loss_v_i_old = compute_loss_v_i(data).item()
 
         # Train policy with multiple steps of gradient descent
         for i in range(train_pi_iters):
@@ -399,7 +407,7 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
             vf_optimizer.zero_grad()
             loss_v = compute_loss_v(data)
             loss_v.backward()
-            mpi_avg_grads(ac.v)  # average grads across MPI processes
+            #mpi_avg_grads(ac.v)  # average grads across MPI processes #TODO check me
             vf_optimizer.step()
 
         # Explorer Predictor function learning
@@ -410,25 +418,14 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
             mpi_avg_grads(explorer.predictor)  # average grads across MPI processes
             predictor_optimizer.step()
 
-
-        # Explorer Value function learning
-        for i in range(train_v_iters):
-            v_i_f_optimizer.zero_grad()
-            loss_v_i = compute_loss_v_i(data)
-            loss_v_i.backward()
-            mpi_avg_grads(explorer.v_i)  # average grads across MPI processes
-            v_i_f_optimizer.step()
-
         # Log changes from update
         kl, ent, cf = pi_info['kl'], pi_info_old['ent'], pi_info['cf']
         logger.store(LossPi=pi_l_old, LossV=v_l_old,
                      RNDloss=loss_predictor_old,
-                     Vpredictor=loss_v_i_old,
                      KL=kl, Entropy=ent, ClipFrac=cf,
                      DeltaLossPi=(loss_pi.item() - pi_l_old),
                      DeltaLossV=(loss_v.item() - v_l_old),
-                     DeltaLossRND=(loss_predictor.item() -loss_predictor_old),
-                     DeltaLossVi=(loss_v_i.item() - loss_v_i_old))
+                     DeltaLossRND=(loss_predictor.item() -loss_predictor_old))
 
 
     """ calculate initial observation std """
@@ -458,10 +455,10 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
     # Main loop: collect experience in env and update/log each epoch
     for epoch in range(epochs):
         for t in range(local_steps_per_epoch):
-            a, v, logp = ac.step(torch.as_tensor(o, dtype=torch.float32))
+            a, v_ex, v_in, logp = ac.step(torch.as_tensor(o, dtype=torch.float32))
 
             # Calculate intrinsic reward
-            r_i, v_i = explorer.step(torch.as_tensor(obs_rms.normalize_me(o), dtype=torch.float32))
+            r_i = explorer.step(torch.as_tensor(obs_rms.normalize_me(o), dtype=torch.float32))
 
             # update obs normalize param
             obs_rms.update(o)
@@ -473,8 +470,8 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
             intr_ret += r_i
 
             # save and log
-            buf.store(o, a, r, r_i, v, v_i, logp)
-            logger.store(VVals=v)
+            buf.store(o, a, r, r_i, v_ex, v_in, logp)
+            logger.store(VExtrinsic=v_ex, VIntrinsic=v_in)
 
             # Update obs (critical!)
             o = next_o
@@ -488,12 +485,10 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
                     print('Warning: trajectory cut off by epoch at %d steps.' % ep_len, flush=True)
                 # if trajectory didn't reach terminal state, bootstrap value target
                 if timeout or epoch_ended:
-                    _, v, _ = ac.step(torch.as_tensor(o, dtype=torch.float32))
-                    _, v_i = explorer.step(torch.as_tensor(obs_rms.normalize_me(o), dtype=torch.float32))
+                    _, v_ex, v_in, _ = ac.step(torch.as_tensor(o, dtype=torch.float32))
                 else:
-                    v = 0
-                    v_i = 0
-                buf.finish_path(v, v_i)
+                    v_ex, v_in = 0, 0
+                buf.finish_path(v_ex, v_in)
                 if terminal:
                     # only save EpRet / EpLen if trajectory finished
                     logger.store(EpRet=ep_ret, EpLen=ep_len)
@@ -514,16 +509,15 @@ def rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=
         logger.log_tabular('Epoch', epoch)
         logger.log_tabular('EpRet', with_min_and_max=True)
         logger.log_tabular('EpLen', average_only=True)
-        logger.log_tabular('VVals', with_min_and_max=True)
+        logger.log_tabular('VExtrinsic', with_min_and_max=True)
+        logger.log_tabular('VIntrinsic', with_min_and_max=True)
         logger.log_tabular('TotalEnvInteracts', (epoch + 1) * steps_per_epoch)
         logger.log_tabular('LossPi', average_only=True)
         logger.log_tabular('LossV', average_only=True)
         logger.log_tabular('DeltaLossPi', average_only=True)
         logger.log_tabular('DeltaLossV', average_only=True)
         logger.log_tabular('RNDloss', average_only=True)
-        logger.log_tabular('Vpredictor', average_only=True)
         logger.log_tabular('DeltaLossRND', average_only=True)
-        logger.log_tabular('DeltaLossVi', average_only=True)
         logger.log_tabular('Entropy', average_only=True)
         logger.log_tabular('KL', average_only=True)
         logger.log_tabular('ClipFrac', average_only=True)
@@ -547,7 +541,7 @@ if __name__ == '__main__':
     parser.add_argument('--steps', type=int, default=4000)  # 4000
     parser.add_argument('--init_steps_obs_std', type=int, default=1000)
     parser.add_argument('--epochs', type=int, default=80)  # 2500
-    parser.add_argument('--exp_name', type=str, default='rnd')
+    parser.add_argument('--exp_name', type=str, default='ppo_rnd')
     parser.add_argument('--polyak', type=float, default=0.95)
     parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--tensorboard', type=bool, default=True)
@@ -570,7 +564,7 @@ if __name__ == '__main__':
         logger_tb_args['instance_details'] = instance_details
         logger_tb_args['aggregate_stats'] = args.aggregate_stats
 
-    rnd(lambda: gym.make(args.env), actor_critic=core.MLPActorCritic,
+    ppo_rnd(lambda: gym.make(args.env), actor_critic=core.MLPActorCritic,
         ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
         gamma=args.gamma, clip_ratio=0.2, pi_lr=args.learning_rate, vf_lr=args.learning_rate,
         train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=args.w_i,

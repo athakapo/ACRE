@@ -1,7 +1,7 @@
 import torch
 import gym
-from rnd import core
-from rnd import rnd
+from ppo_rnd import core
+from ppo_rnd import ppo_rnd
 import numpy as np
 
 if __name__ == '__main__':
@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     torch.set_num_threads(torch.get_num_threads())
 
-    rnd(lambda: gym.make(args.env), actor_critic=core.MLPActorCritic,
+    ppo_rnd(lambda: gym.make(args.env), actor_critic=core.MLPActorCritic,
         ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
         gamma=args.gamma, clip_ratio=0.4, pi_lr=args.learning_rate, vf_lr=args.learning_rate,
         train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=args.w_i,
