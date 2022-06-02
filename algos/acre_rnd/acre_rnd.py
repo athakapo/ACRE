@@ -546,8 +546,8 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
                 # Handle GNN updates
                 rnd_estimation = time.time()
                 # Update data over which the RND estimation is going to take place
-                num_data_rnd = min(t, mult_rnd_samples * steps_per_epoch)
-                num_data_rnd = 500
+                #num_data_rnd = min(t, mult_rnd_samples * steps_per_epoch)
+                num_data_rnd = min(t, 1000)
                 #states_buf = replay_buffer.get_last_states(num_data_rnd)
                 states_buf = replay_buffer.get_random_states(num_data_rnd)
 

@@ -130,11 +130,11 @@ class ReplayBuffer:
 
 
 def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=None, seed=0,
-            steps_per_epoch=4000, epochs=100, replay_size=int(1e6), gamma=0.99, n_components=7,
-            polyak=0.995, lr=1e-3, beta=0.1, batch_size=100, start_steps=10000, mult_gmm_samples=3,
-            update_after=1000, update_every=50, num_test_episodes=10, max_ep_len=1000, plot_gmm=False,
-            train_v_iters=80, estimate_gmm_every=5, q_powered_gmm= False, logger_kwargs=dict(),
-            logger_tb_args=dict(), save_freq=10):
+         steps_per_epoch=4000, epochs=100, replay_size=int(1e6), gamma=0.99, n_components=7,
+         polyak=0.995, lr=1e-3, beta=0.1, batch_size=100, start_steps=10000, gmm_samples_mult=1000,
+         update_after=1000, update_every=50, num_test_episodes=10, max_ep_len=1000, plot_gmm=False,
+         train_v_iters=80, estimate_gmm_every=5, q_powered_gmm= False, logger_kwargs=dict(),
+         logger_tb_args=dict(), save_freq=10):
     """
     Actor-Critic with Reward-Preserving Exploration (ACRE)
 
@@ -225,7 +225,7 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
         n_components (int): The number of mixture components used for the
             gmm fitting.
 
-        mult_gmm_samples (int): Number of last episodes the transitions of
+        gmm_samples_mult (int): Number of last episodes the transitions of
             which are going to be used for the next GMM update.
 
         train_v_iters (int): Number of gradient descent steps to take on
@@ -456,7 +456,6 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
 
     # Prepare for interaction with environment
     total_steps = steps_per_epoch * epochs
-    num_last_obs_gmm_update = mult_gmm_samples * steps_per_epoch
     start_time = time.time()
     o, ep_ret, ep_len = env.reset(), 0, 0
 
@@ -511,8 +510,8 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
                 # Handle GNN updates
                 gmm_estimation = time.time()
                 # Update data over which the GMM estimation is going to take place
-                num_data_gmm = min(t, mult_gmm_samples * steps_per_epoch)
-                num_data_gmm = min(t, 1000) #TODO check if this is enough
+                num_data_gmm = min(t, gmm_samples_mult * steps_per_epoch)
+                #num_data_gmm = 1000 #TODO check if this in enough [huge improvement in computation time]
                 if q_powered_gmm:
                     #states_buf = replay_buffer.get_last_aug_states(num_data_gmm)
                     states_buf = replay_buffer.get_random_aug_states(num_data_gmm)
@@ -604,6 +603,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', '-s', type=int, default=60)
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--beta', type=float, default=0.01)
+    parser.add_argument('--gmm_samples', type=int, default=1000)
     parser.add_argument('--n_components', type=float, default=7)
     parser.add_argument('--estimate_gmm_every', type=int, default=1)
     parser.add_argument('--plot_gmm', type=bool, default=False)
@@ -630,7 +630,7 @@ if __name__ == '__main__':
     torch.set_num_threads(torch.get_num_threads())
 
     acre(lambda: gym.make(args.env), actor_critic=core.MLPActorCritic,
-            ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
-            gamma=args.gamma, seed=args.seed, epochs=args.epochs, beta=args.beta, plot_gmm=args.plot_gmm,
-            n_components=args.n_components, estimate_gmm_every=args.estimate_gmm_every, q_powered_gmm=args.q_powered_gmm,
-            logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
+         ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
+         gamma=args.gamma, seed=args.seed, epochs=args.epochs, beta=args.beta, plot_gmm=args.plot_gmm,
+         n_components=args.n_components, estimate_gmm_every=args.estimate_gmm_every, q_powered_gmm=args.q_powered_gmm,
+         gmm_samples_mult=args.gmm_samples, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
