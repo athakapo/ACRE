@@ -7,9 +7,10 @@ ACRE is a model-free, off-policy RL algorithm specifically designed to incorpora
 
 Installation
 ------------
-1. Install openMPI
+1. Install ubuntu needed libraries
 ```
-sudo apt-get update && sudo apt-get install libopenmpi-dev
+sudo apt install libpython3.X-dev
+sudo apt install libopenmpi-dev
 ```
 2. Clone this repository
 ```
