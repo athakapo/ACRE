@@ -9,7 +9,7 @@ ACRE is a model-free, off-policy RL algorithm specifically designed to incorpora
 
 Installation 
 ------------
-###### [Tested with **python 3.7** and **Ubuntu 18.04** and **20.04**]
+###### [Tested with **python 3.7** and **Ubuntu 18.04** & **20.04**]
 
 1. Install ubuntu needed libraries
 ```
