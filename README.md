@@ -56,6 +56,11 @@ export PYTHONPATH="$PWD"
       ```
       python run_experiment_grid.py
       ```
+4. Monitor learning progress through [Tensorboard](https://www.tensorflow.org/tensorboard)*
+```
+tensorboard --logdir tensorboard/
+```
+###### *execute this command after having started the training script (Step 3)
 
 Project Structure
 ------------

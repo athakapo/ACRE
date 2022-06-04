@@ -352,7 +352,7 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
 
             rnd_next = ac.v_rnd(o2)
             backup = r + gamma * (1 - d) * (q_pi_targ + beta * rnd_next)
-
+            #print(f'Q values mean: {torch.mean(q_pi_targ)} | RND values mean: {torch.mean(rnd_next)}')
 
         # MSE loss against Bellman backup
         loss_q1 = ((q1 - backup) ** 2).mean()
@@ -378,6 +378,7 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
 
         # Entropy-regularized policy loss
         loss_pi = (- beta * rnd_est - q_pi).mean()
+        #print(f'Pi values mean: {torch.mean(q_pi)} | RND values mean: {torch.mean(rnd_est)}')
 
         # Useful info for logging
         pi_info = dict(LogPi=logp_pi.detach().numpy(),

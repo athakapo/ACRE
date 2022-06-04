@@ -339,6 +339,7 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
                 gmm_next = ac.v_gmm(o2)
 
             backup = r + gamma * (1 - d) * (q_pi_targ - beta * gmm_next)
+            print(f'Q values mean: {torch.mean(q_pi_targ)} | RND values mean: {torch.mean(gmm_next)}')
 
 
 
@@ -369,6 +370,7 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
 
         # Entropy-regularized policy loss
         loss_pi = (beta * gmm_est - q_pi).mean()
+        print(f'Pi values mean: {torch.mean(q_pi)} | RND values mean: {torch.mean(gmm_est)}')
 
         # Useful info for logging
         pi_info = dict(LogPi=logp_pi.detach().numpy(),
