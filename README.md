@@ -23,7 +23,7 @@ git clone https://github.com/athakapo/ACRE.git
 4. Enter project's repository and create a new python environment of your choice. Here we provide a `venv` example, however the installation instructions using `conda` environment is pretty similar.
 ```
 cd ACRE
-python -m venv venv
+python3.7 -m venv venv
 ``` 
 5. Activate the environment
 ```
