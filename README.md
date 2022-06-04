@@ -18,7 +18,7 @@ sudo apt install libopenmpi-dev
 ```
 2. Install MuJoCo (Optional)
 
-   Follow [readme instructions](https://github.com/openai/mujoco-py/blob/master/README.md) to install mujoco-py
+   If you want to use the [MuJoCo](https://mujoco.org/) environments you must follow [readme instructions](https://github.com/openai/mujoco-py/blob/master/README.md) to install mujoco-py
 
 3. Clone this repository
 ```
