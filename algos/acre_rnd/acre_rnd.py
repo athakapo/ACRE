@@ -382,7 +382,7 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
 
         # Useful info for logging
         pi_info = dict(LogPi=logp_pi.detach().numpy(),
-                       RNDVals=beta * rnd_est.detach().numpy())
+                       RNDVals=-beta * rnd_est.detach().numpy())
 
         return loss_pi, pi_info
 
