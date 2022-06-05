@@ -454,8 +454,6 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
                 ep_len += 1
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
 
-    bellman_update_allowed = False
-
     # Prepare for interaction with environment
     total_steps = steps_per_epoch * epochs
     start_time = time.time()
@@ -569,7 +567,6 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
             if gmm.trained:
                 # Auxiliary info about the gmm estimation
                 #gmm.disp_info(plot3d=plot_gmm)
-
                 # Log info about epoch
                 logger.log_tabular('Epoch', epoch)
                 logger.log_tabular('EpRet', with_min_and_max=True)
