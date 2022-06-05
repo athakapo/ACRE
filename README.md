@@ -33,10 +33,16 @@ python3.7 -m venv venv
 ```
 . venv/bin/activate
 ```
-6. Install the needed dependencies
+6. Install the needed dependencies*
 ```
 python -m pip install -r requirements.txt
 ```
+> *If you encounter any problem in the installation of **mpi4py**, please check this [quide](https://mpi4py.readthedocs.io/en/stable/install.html):
+   Probably you need to find your current path to mpicc (sudo find / -name mpicc) and then run:
+   `
+   env MPICC=path_to_mpicc/mpicc python -m pip install mpi4py==3.0.3
+   `
+
 Example Usage
 ------------
 1. Open up `terminal`, navigate to project's repository and activate python environment
