@@ -163,7 +163,7 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
              steps_per_epoch=4000, epochs=100, replay_size=int(1e6), gamma=0.99,
              polyak=0.995, lr=1e-3, beta=0.1, batch_size=100, start_steps=10000, mult_rnd_samples=3,
              update_after=1000, update_every=50, num_test_episodes=10, max_ep_len=1000,
-             train_v_iters=80, estimate_rnd_every=5, logger_kwargs=dict(),
+             train_v_iters=80, estimate_rnd_every=5, logger_kwargs=dict(), rnd_num_nodes=256,
              logger_tb_args=dict(), save_freq=10, RNDoutput_size=40, clip_obs=5):
     """
     Actor-Critic with Reward-Preserving Exploration (ACRE)
@@ -304,7 +304,7 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
     ac_targ = deepcopy(ac)
 
     # Create RND model
-    explorer = RNDModel(obs_dim[0], RNDoutput_size)
+    explorer = RNDModel(obs_dim[0], RNDoutput_size, hidden_sizes=(rnd_num_nodes, rnd_num_nodes))
     obs_rms = RunningMeanStd(shape=env.observation_space.shape, clip_val=clip_obs)
     rnd_modules_updated = False
 
