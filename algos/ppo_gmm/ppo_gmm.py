@@ -462,7 +462,7 @@ if __name__ == '__main__':
     parser.add_argument('--hid', type=int, default=256)  # 64
     parser.add_argument('--l', type=int, default=2)  # 2
     parser.add_argument('--gamma', type=float, default=0.99)  # 0.99
-    parser.add_argument('--w_i', type=float, default=0.5)
+    parser.add_argument('--w_i', type=float, default=0.1)
     parser.add_argument('--n_components', type=int, default=7)
     parser.add_argument('--seed', '-s', type=int, default=60)  # 2
     parser.add_argument('--cpu', type=int, default=4)  # 4
