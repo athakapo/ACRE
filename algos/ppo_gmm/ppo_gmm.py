@@ -385,7 +385,7 @@ def ppo_gmm(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_t
 
             # Calculate intrinsic reward
             if gmm.trained:
-                r_i = gmm.log_prob(o.reshape(1,-1))
+                r_i = - gmm.log_prob(o.reshape(1,-1))
             else:
                 r_i = 0.0
             next_o, r, d, _ = env.step(a)
