@@ -1,6 +1,7 @@
 from utils.run_utils import ExperimentGrid
 #from algos.acre.acre import acre
-from algos.acre_rnd.acre_rnd import acre_rnd
+#from algos.acre_rnd.acre_rnd import acre_rnd
+from algos.ppo_gmm.ppo_gmm import ppo_gmm
 
 if __name__ == '__main__':
     import argparse
@@ -13,17 +14,15 @@ if __name__ == '__main__':
     parser.add_argument('--cpu', type=int, default=1)
     args = parser.parse_args()
 
-    eg = ExperimentGrid(name='acre_rnd-pyt-bench_MountainCarContinuous-v0')
+    eg = ExperimentGrid(name='acre_rnd-pyt-bench2')
     eg.add('suite', 'gym')
     eg.add('env_name', 'MountainCarContinuous-v0', '', True)
     eg.add('ac_kwargs', dict(hidden_sizes=[256] * 2))
-    eg.add('seed', [0, 1, 2, 3, 4])
+    eg.add('seed', [4, 5, 6, 7, 8, 9])
     eg.add('steps_per_epoch', 4000)
     eg.add('gamma', 0.99)
     eg.add('epochs', 125)
-    eg.add('beta', 100)
-    eg.add('RNDoutput_size', 4)
-    eg.add('rnd_num_nodes', 256)
-    eg.add('estimate_rnd_every', 1)
+    eg.add('w_i', [2.0, 5.0, 10.0, 20.0])
+    eg.add('n_components', 7)
     eg.add('logger_tb_args', logger_tb_args)
-    eg.run(acre_rnd, num_cpu=args.cpu)
+    eg.run(ppo_gmm, num_cpu=args.cpu)

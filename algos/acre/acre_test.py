@@ -568,6 +568,15 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
             # ar_ret, ar_info = ep_logger.get_last_values(mult_gmm_samples)
             # beta =  np.abs(np.max(ar_ret) / np.max(ar_info))
 
+            # OR
+            #
+            #Q1_vals = [np.mean(x) for x in logger.epoch_dict['Q1Vals']]
+            #Q2_vals = [np.mean(x) for x in logger.epoch_dict['Q2Vals']]
+            #avQ = (sum(Q1_vals) / len(Q1_vals) + sum(Q2_vals) / len(Q2_vals))/2
+            #gmm_vals = [np.mean(x) for x in logger.epoch_dict['GMMVals']]
+            #avGMM = sum(gmm_vals) / len(gmm_vals)
+            #beta = np.abs(avQ * 0.00625 / avGMM)
+
             episode_timer_end = time.time()
             print(f'Episode needed: {episode_timer_end - episode_timer_start} seconds')
             print(f'GMM estimation in episode: {time_gmm_estimation} seconds')

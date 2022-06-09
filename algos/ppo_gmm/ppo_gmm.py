@@ -9,7 +9,7 @@ import time
 import itertools
 
 from algos.ppo_gmm import core
-#from algos.ppo_gmm.core import RNDModel
+# from algos.ppo_gmm.core import RNDModel
 from utils.gmm import GMM
 from utils.logx import EpochLogger, TensorBoardLogger
 from utils.mpi_pytorch import setup_pytorch_for_mpi, sync_params, mpi_avg_grads
@@ -118,14 +118,14 @@ class PPOBuffer:
         # final advantage values
         final_adv = self.adv_buf + self.w_i * self.adv_intr_buf
 
-        data = dict(obs=self.obs_buf,  act=self.act_buf, ret=self.ret_buf,
+        data = dict(obs=self.obs_buf, act=self.act_buf, ret=self.ret_buf,
                     ret_intr=self.ret_intr_buf, adv=final_adv, logp=self.logp_buf)
         return {k: torch.as_tensor(v, dtype=torch.float32) for k, v in data.items()}
 
     @staticmethod
     def normalize_ndarray(array):
         array_mean, array_std = mpi_statistics_scalar(array)
-        return (array- array_mean) / array_std
+        return (array - array_mean) / array_std
 
     def get_random_states(self, num_samples, t):
         idxs = np.random.randint(0, min(t, self.max_size), size=num_samples)
@@ -134,7 +134,8 @@ class PPOBuffer:
 
 def ppo_gmm(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type=None, plot_gmm=False,
             reward_eng=False, seed=0, steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
-            vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=1.0, n_components=7,  #TODO check me out
+            vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=1.0, n_components=7,
+            # TODO check me out
             clip_obs=5, target_kl=0.01, logger_kwargs=dict(), logger_tb_args=dict(), save_freq=10):
     """
     Random Network Distillation (by clipping),
@@ -291,7 +292,8 @@ def ppo_gmm(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_t
     # Set up experience buffer
     local_steps_per_epoch = steps_per_epoch  # int(steps_per_epoch / num_procs())
     buf = PPOBuffer(obs_dim, act_dim, local_steps_per_epoch, gamma, lam, w_i)
-    #info_buffer = InfoBuffer(episodes=estimate_gmm_every, max_ep_len=max_ep_len, gamma=gamma)
+
+    # info_buffer = InfoBuffer(episodes=estimate_gmm_every, max_ep_len=max_ep_len, gamma=gamma)
 
     # Set up function for computing PPO policy loss
     def compute_loss_pi(data):
@@ -319,7 +321,7 @@ def ppo_gmm(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_t
         v_core = ac.v_core(obs)
         loss_v_ex = ((ac.v_ex(v_core) - ret_ex) ** 2).mean()
         if intrinsic_update_flag:
-            loss_v_in = ((ac.v_in(v_core) - ret_intr) ** 2).mean() # computing curiosity-driven (Gaussian Mixture Model) value loss
+            loss_v_in = ((ac.v_in(v_core) - ret_intr) ** 2).mean()  # computing curiosity-driven (Gaussian Mixture Model) value loss
             loss_v = loss_v_ex + loss_v_in
         else:
             loss_v = loss_v_ex
@@ -359,11 +361,12 @@ def ppo_gmm(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_t
             vf_optimizer.zero_grad()
             loss_v = compute_loss_v(data, gmm.trained)
             loss_v.backward()
-            #mpi_avg_grads(ac.v)  # average grads across MPI processes #TODO check me
+            # mpi_avg_grads(ac.v)  # average grads across MPI processes #TODO check me
             vf_optimizer.step()
 
         # Update Gaussian Mixture Model
-        gmm.update(data['obs'].numpy())
+        if w_i != 0.0:
+            gmm.update(data['obs'].numpy())
 
         # Log changes from update
         kl, ent, cf = pi_info['kl'], pi_info_old['ent'], pi_info['cf']
@@ -371,7 +374,6 @@ def ppo_gmm(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_t
                      KL=kl, Entropy=ent, ClipFrac=cf,
                      DeltaLossPi=(loss_pi.item() - pi_l_old),
                      DeltaLossV=(loss_v.item() - v_l_old))
-
 
     # Prepare for interaction with environment
     start_time = time.time()
@@ -385,7 +387,7 @@ def ppo_gmm(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_t
 
             # Calculate intrinsic reward
             if gmm.trained:
-                r_i = - gmm.log_prob(o.reshape(1,-1))
+                r_i = - gmm.log_prob(o.reshape(1, -1))
             else:
                 r_i = 0.0
             next_o, r, d, _ = env.step(a)
@@ -399,7 +401,7 @@ def ppo_gmm(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_t
             logger.store(VExtrinsic=v_ex, VIntrinsic=v_in, LogProbReward=r_i)
 
             # Store observation to info buffer to be used for GMM estimation
-            #info_buffer.store(o, a)
+            # info_buffer.store(o, a)
 
             # Update obs (critical!)
             o = next_o
@@ -429,7 +431,6 @@ def ppo_gmm(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_t
         if (epoch % save_freq == 0) or (epoch == epochs - 1):
             logger.save_state({'env': env}, None)
 
-
         # Perform PPO update!
         update()
 
@@ -457,7 +458,8 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='MountainCarContinuous-v0')  # LunarLanderContinuous-v2, Swimmer-v2, MountainCarContinuous-v0
+    parser.add_argument('--env', type=str,
+                        default='MountainCarContinuous-v0')  # LunarLanderContinuous-v2, Swimmer-v2, MountainCarContinuous-v0
     parser.add_argument('--reward_type', type=str, default=None)  # None
     parser.add_argument('--hid', type=int, default=256)  # 64
     parser.add_argument('--l', type=int, default=2)  # 2
