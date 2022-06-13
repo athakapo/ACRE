@@ -10,6 +10,7 @@ __pycache__/
 
 data/
 tensorboard/
+tensorboard_old/
 
 # Distribution / packaging
 .Python

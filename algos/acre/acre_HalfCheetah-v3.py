@@ -7,7 +7,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='Swimmer-v2')
+    parser.add_argument('--env', type=str, default='HalfCheetah-v3')
     parser.add_argument('--reward_type', type=str, default=None)  # None
     parser.add_argument('--hid', type=int, default=256)
     parser.add_argument('--l', type=int, default=2)

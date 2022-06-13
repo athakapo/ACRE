@@ -1,7 +1,8 @@
 import torch
 import gym
-from acre import core
-from acre import acre
+from ppo import core
+from ppo import ppo
+import numpy as np
 
 if __name__ == '__main__':
     import argparse
@@ -13,16 +14,16 @@ if __name__ == '__main__':
     parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--epochs', type=int, default=125)
-    parser.add_argument('--beta', type=float, default=0.0007)
-    parser.add_argument('--gmm_samples_mult', type=int, default=60)
-    parser.add_argument('--n_components', type=float, default=7)
-    parser.add_argument('--estimate_gmm_every', type=int, default=1)
-    parser.add_argument('--plot_gmm', type=bool, default=False)
-    parser.add_argument('--q_powered_gmm', type=bool, default=False)
-    parser.add_argument('--exp_name', type=str, default='acre')
+    parser.add_argument('--epochs', type=int, default=250)
+    parser.add_argument('--batch_size', type=int, default=100)
+    parser.add_argument('--exp_name', type=str, default='ppo')
+    parser.add_argument('--cpu', type=int, default=4)  # 4
+    parser.add_argument('--steps', type=int, default=4000)  # 4000
+    parser.add_argument('--polyak', type=float, default=0.95)
+    parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--tensorboard', type=bool, default=True)
     parser.add_argument('--aggregate_stats', type=int, default=100)
+
     args = parser.parse_args()
 
     from utils.run_utils import setup_logger_kwargs
@@ -41,11 +42,9 @@ if __name__ == '__main__':
 
     torch.set_num_threads(torch.get_num_threads())
 
-    acre(lambda: gym.make(args.env), actor_critic=core.MLPActorCritic,
-         ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
-         gamma=args.gamma, seed=args.seed, epochs=args.epochs, beta=args.beta, plot_gmm=args.plot_gmm,
-         n_components=args.n_components, gmm_samples_mult=args.gmm_samples_mult,
-         estimate_gmm_every=args.estimate_gmm_every, q_powered_gmm=args.q_powered_gmm,
-         logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
-
-
+    ppo(lambda: gym.make(args.env), actor_critic=core.MLPActorCritic,
+        ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
+        gamma=args.gamma, clip_ratio=0.4, pi_lr=args.learning_rate, vf_lr=args.learning_rate,
+        train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000,
+        target_kl=0.01, seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs,
+        logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)

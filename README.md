@@ -5,25 +5,44 @@ ACRE is a model-free, off-policy RL algorithm specifically designed to incorpora
 
 ![ACRE performance insights](images/acre_rationale.png)
 
-Installation
+
+
+Installation 
 ------------
-1. Open up `terminal` and clone this repository
+###### [Tested with **python 3.7** and **Ubuntu 18.04** & **20.04**]
+
+1. Install ubuntu needed libraries
+```
+sudo apt install libpython3.7-dev
+sudo apt install libopenmpi-dev
+```
+2. Install MuJoCo (Optional)
+
+   If you want to use the [MuJoCo](https://mujoco.org/) environments you must follow [readme instructions](https://github.com/openai/mujoco-py/blob/master/README.md) to install mujoco-py
+
+3. Clone this repository
 ```
 git clone https://github.com/athakapo/ACRE.git
 ``` 
-2. Enter project's repository and create a new python environment of your choice. Here we provide a `venv` example, however the installation instructions using `conda` environment is pretty similar.
+4. Enter project's repository and create a new python environment of your choice. Here we provide a `venv` example, however the installation instructions using `conda` environment is pretty similar.
 ```
 cd ACRE
-python -m venv venv
+python3.7 -m venv venv
 ``` 
-2. Activate the environment
+5. Activate the environment
 ```
 . venv/bin/activate
 ```
-3. Install the needed dependencies
+6. Install the needed dependencies*
 ```
 python -m pip install -r requirements.txt
 ```
+> *If you encounter any problem in the installation of **mpi4py**, please check this [guide](https://mpi4py.readthedocs.io/en/stable/install.html):
+   Probably you need to find your current path to mpicc (sudo find / -name mpicc) and then run:
+   `
+   env MPICC=path_to_mpicc/mpicc python -m pip install mpi4py==3.0.3
+   `
+
 Example Usage
 ------------
 1. Open up `terminal`, navigate to project's repository and activate python environment
@@ -43,6 +62,12 @@ export PYTHONPATH="$PWD"
       ```
       python run_experiment_grid.py
       ```
+4. Monitor learning progress through [Tensorboard](https://www.tensorflow.org/tensorboard)*
+###### *execute this command after having started the training script (Step 3)
+```
+tensorboard --logdir tensorboard/
+```
+
 
 Project Structure
 ------------

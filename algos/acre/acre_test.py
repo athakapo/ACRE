@@ -1,6 +1,7 @@
 from copy import deepcopy
 import itertools
 import numpy as np
+import pandas as pd
 import torch
 from torch.optim import Adam
 import gym
@@ -400,7 +401,7 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
         # Record things
         logger.store(LossGMM=loss_gmm.item(), DeltaLossGMM=(loss_gmm.item() - gmm_l_old))
 
-    def update(data):
+    def update(data, dict_log):
         # First run one gradient descent step for Q1 and Q2
         q_optimizer.zero_grad()
         loss_q, q_info = compute_loss_q(data)
@@ -409,6 +410,7 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
 
         # Record things
         logger.store(LossQ=loss_q.item(), **q_info)
+        dict_log['AverageQVals'].append(np.mean((q_info['Q1Vals'] + q_info['Q2Vals'])/2))
 
         # Freeze Q-networks so you don't waste computational effort
         # computing gradients for them during the policy learning step.
@@ -431,6 +433,8 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
 
         # Record things
         logger.store(LossPi=loss_pi.item(), **pi_info)
+        dict_log['AverageGMMVals'].append(np.mean(pi_info['GMMVals']))
+        dict_log['AverageLogPi'].append(np.mean(pi_info['LogPi']))
 
         # Finally, update target networks by polyak averaging.
         with torch.no_grad():
@@ -439,6 +443,8 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
                 # params, as opposed to "mul" and "add", which would make new tensors.
                 p_targ.data.mul_(polyak)
                 p_targ.data.add_((1 - polyak) * p.data)
+
+        return dict_log
 
     def get_action(o, deterministic=False):
         return ac.act(torch.as_tensor(o, dtype=torch.float32),
@@ -463,6 +469,7 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
     time_gmm_estimation = 0
     t_ep = 0
 
+    df_log = pd.DataFrame(columns=['EnvInteractions', 'AverageQVals', 'AverageGMMVals', 'AverageLogPi'])
 
     # Main loop: collect experience in env and update/log each epoch
     for t in range(total_steps):
@@ -539,9 +546,20 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
 
         # Update handling
         if gmm.trained and t >= update_after and t % update_every == 0:
+            update_dict_j = {'AverageQVals': [], 'AverageGMMVals': [], 'AverageLogPi': []}
             for j in range(update_every):
                 batch = replay_buffer.sample_batch(batch_size)
-                update(data=batch)
+                update_dict_j = update(data=batch, dict_log=update_dict_j)
+
+            update_dict = {}
+            update_dict["EnvInteractions"] = t
+            update_dict["AverageEpRet"] = np.mean(EpRetBuffer)
+            update_dict["AverageQVals"] = sum(update_dict_j["AverageQVals"]) / len(update_dict_j["AverageQVals"])
+            update_dict["AverageGMMVals"] = sum(update_dict_j["AverageGMMVals"]) / len(update_dict_j["AverageGMMVals"])
+            update_dict["AverageLogPi"] = sum(update_dict_j["AverageLogPi"]) / len(update_dict_j["AverageLogPi"])
+            df_log = df_log.append(update_dict, ignore_index=True)
+
+            ep_till_last_update = t_ep
 
         # End of epoch handling
         if (t + 1) % steps_per_epoch == 0:
@@ -549,6 +567,15 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
             # TODO Dynamically adjust beta weight
             # ar_ret, ar_info = ep_logger.get_last_values(mult_gmm_samples)
             # beta =  np.abs(np.max(ar_ret) / np.max(ar_info))
+
+            # OR
+            #
+            #Q1_vals = [np.mean(x) for x in logger.epoch_dict['Q1Vals']]
+            #Q2_vals = [np.mean(x) for x in logger.epoch_dict['Q2Vals']]
+            #avQ = (sum(Q1_vals) / len(Q1_vals) + sum(Q2_vals) / len(Q2_vals))/2
+            #gmm_vals = [np.mean(x) for x in logger.epoch_dict['GMMVals']]
+            #avGMM = sum(gmm_vals) / len(gmm_vals)
+            #beta = np.abs(avQ * 0.00625 / avGMM)
 
             episode_timer_end = time.time()
             print(f'Episode needed: {episode_timer_end - episode_timer_start} seconds')
