@@ -23,6 +23,7 @@ if __name__ == '__main__':
     parser.add_argument('--exp_name', type=str, default='acre')
     parser.add_argument('--tensorboard', type=bool, default=True)
     parser.add_argument('--aggregate_stats', type=int, default=100)
+    parser.add_argument('--save_all_states', type=bool, default=True)
     args = parser.parse_args()
 
     from utils.run_utils import setup_logger_kwargs
@@ -31,7 +32,7 @@ if __name__ == '__main__':
 
     logger_tb_args = dict()
     logger_tb_args['enable'] = args.tensorboard
-    if args.tensorboard:
+    if args.tensorboard or args.save_all_states:
         if args.reward_type is not None:
             instance_details = f"{args.env}-RT{args.reward_type}-{args.exp_name}-[{args.l}_{args.hid}]"
         else:
@@ -46,6 +47,6 @@ if __name__ == '__main__':
          gamma=args.gamma, seed=args.seed, epochs=args.epochs, beta=args.beta, plot_gmm=args.plot_gmm,
          n_components=args.n_components, gmm_samples_mult=args.gmm_samples_mult,
          estimate_gmm_every=args.estimate_gmm_every, q_powered_gmm=args.q_powered_gmm,
-         logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
+         save_all_states=args.save_all_states, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
 
 

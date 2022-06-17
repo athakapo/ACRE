@@ -8,6 +8,7 @@ import time
 from algos.acre import core
 from utils.gmm import GMM
 from utils.logx import EpochLogger, TensorBoardLogger
+import pickle
 
 
 class InfoBuffer:
@@ -134,7 +135,7 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
          polyak=0.995, lr=1e-3, beta=0.1, batch_size=100, start_steps=10000, gmm_samples_mult=1000,
          update_after=1000, update_every=50, num_test_episodes=10, max_ep_len=1000, plot_gmm=False,
          train_v_iters=80, estimate_gmm_every=5, q_powered_gmm= False, logger_kwargs=dict(),
-         logger_tb_args=dict(), save_freq=10):
+         save_all_states=False, logger_tb_args=dict(), save_freq=10):
     """
     Actor-Critic with Reward-Preserving Exploration (ACRE)
 
@@ -463,6 +464,8 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
     time_gmm_estimation = 0
     t_ep = 0
 
+    if save_all_states:
+        all_states = [o]
 
     # Main loop: collect experience in env and update/log each epoch
     for t in range(total_steps):
@@ -494,6 +497,10 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
         # Super critical, easy to overlook step: make sure to update
         # most recent observation!
         o = o2
+
+        if save_all_states:
+            # save all states for t-sne analysis
+            all_states.append(o2)
 
         timeout = ep_len == max_ep_len
         terminal = d or timeout
@@ -536,6 +543,8 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
             t_ep += 1
 
             o, ep_ret, ep_len = env.reset(), 0, 0
+            if save_all_states:
+                all_states.append(o)
 
         # Update handling
         if gmm.trained and t >= update_after and t % update_every == 0:
@@ -587,6 +596,11 @@ def acre(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_type
                 logger.log_tabular('Time', time.time() - start_time)
                 logger.dump_tabular()
 
+                if save_all_states:
+                    # Save pickle with all states
+                    with open(f'{logger_tb.tensorboard_path}/all_states.pkl', 'wb') as f:
+                        pickle.dump(all_states, f)
+
             episode_timer_start = time.time()
             time_gmm_estimation = 0
 
@@ -610,6 +624,7 @@ if __name__ == '__main__':
     parser.add_argument('--exp_name', type=str, default='acre')
     parser.add_argument('--tensorboard', type=bool, default=True)
     parser.add_argument('--aggregate_stats', type=int, default=100)
+    parser.add_argument('--save_all_states', type=bool, default=True)
     args = parser.parse_args()
 
     from utils.run_utils import setup_logger_kwargs
@@ -618,7 +633,7 @@ if __name__ == '__main__':
 
     logger_tb_args = dict()
     logger_tb_args['enable'] = args.tensorboard
-    if args.tensorboard:
+    if args.tensorboard or args.save_all_states:
         if args.reward_type is not None:
             instance_details = f"{args.env}-RT{args.reward_type}-{args.exp_name}-[{args.l}_{args.hid}]"
         else:
@@ -632,4 +647,4 @@ if __name__ == '__main__':
          ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
          gamma=args.gamma, seed=args.seed, epochs=args.epochs, beta=args.beta, plot_gmm=args.plot_gmm,
          n_components=args.n_components, estimate_gmm_every=args.estimate_gmm_every, q_powered_gmm=args.q_powered_gmm,
-         gmm_samples_mult=args.gmm_samples, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
+         save_all_states=args.save_all_states, gmm_samples_mult=args.gmm_samples, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)

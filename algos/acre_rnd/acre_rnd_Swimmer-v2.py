@@ -19,8 +19,9 @@ if __name__ == '__main__':
     parser.add_argument('--RNDoutput_size', type=int, default=64)
     parser.add_argument('--estimate_rnd_every', type=int, default=1)
     parser.add_argument('--exp_name', type=str, default='acre_rnd')
-    parser.add_argument('--tensorboard', type=bool, default=False)
+    parser.add_argument('--tensorboard', type=bool, default=True)
     parser.add_argument('--aggregate_stats', type=int, default=100)
+    parser.add_argument('--save_all_states', type=bool, default=True)
     args = parser.parse_args()
 
     from utils.run_utils import setup_logger_kwargs
@@ -29,7 +30,7 @@ if __name__ == '__main__':
 
     logger_tb_args = dict()
     logger_tb_args['enable'] = args.tensorboard
-    if args.tensorboard:
+    if args.tensorboard or args.save_all_states:
         if args.reward_type is not None:
             instance_details = f"{args.env}-RT{args.reward_type}-{args.exp_name}-[{args.l}_{args.hid}]-beta_{args.beta}"
         else:
@@ -42,6 +43,6 @@ if __name__ == '__main__':
              ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
              gamma=args.gamma, seed=args.seed, epochs=args.epochs, beta=args.beta,
              estimate_rnd_every=args.estimate_rnd_every, RNDoutput_size=args.RNDoutput_size,
-             rnd_num_nodes=args.rnd_num_nodes, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
+             save_all_states=args.save_all_states, rnd_num_nodes=args.rnd_num_nodes, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
 
 

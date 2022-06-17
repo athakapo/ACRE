@@ -8,6 +8,7 @@ import time
 from algos.acre_rnd import core
 from algos.acre_rnd.core import RNDModel
 from utils.logx import EpochLogger, TensorBoardLogger
+import pickle
 
 
 class InfoBuffer:
@@ -164,7 +165,7 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
              polyak=0.995, lr=1e-3, beta=0.1, batch_size=100, start_steps=10000, mult_rnd_samples=3,
              update_after=1000, update_every=50, num_test_episodes=10, max_ep_len=1000,
              train_v_iters=80, estimate_rnd_every=5, logger_kwargs=dict(), rnd_num_nodes=256,
-             logger_tb_args=dict(), save_freq=10, RNDoutput_size=40, clip_obs=5):
+             save_all_states=False, logger_tb_args=dict(), save_freq=10, RNDoutput_size=40, clip_obs=5):
     """
     Actor-Critic with Reward-Preserving Exploration (ACRE)
 
@@ -492,6 +493,8 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
     time_rnd_estimation = 0
     t_ep = 0
 
+    if save_all_states:
+        all_states = [o]
 
     # Main loop: collect experience in env and update/log each epoch
     for t in range(total_steps):
@@ -528,6 +531,10 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
         # Super critical, easy to overlook step: make sure to update
         # most recent observation!
         o = o2
+
+        if save_all_states:
+            # save all states for t-sne analysis
+            all_states.append(o2)
 
         timeout = ep_len == max_ep_len
         terminal = d or timeout
@@ -568,6 +575,8 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
 
             t_ep += 1
             o, ep_ret, ep_len = env.reset(), 0, 0
+            if save_all_states:
+                all_states.append(o)
 
         # Update handling
         if rnd_modules_updated and t >= update_after and t % update_every == 0:
@@ -612,6 +621,11 @@ def acre_rnd(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_
                 logger.log_tabular('Time', time.time() - start_time)
                 logger.dump_tabular()
 
+                if save_all_states:
+                    # Save pickle with all states
+                    with open(f'{logger_tb.tensorboard_path}/all_states.pkl', 'wb') as f:
+                        pickle.dump(all_states, f)
+
             episode_timer_start = time.time()
             time_rnd_estimation = 0
 
@@ -632,6 +646,7 @@ if __name__ == '__main__':
     parser.add_argument('--exp_name', type=str, default='acre_rnd')
     parser.add_argument('--tensorboard', type=bool, default=True)
     parser.add_argument('--aggregate_stats', type=int, default=100)
+    parser.add_argument('--save_all_states', type=bool, default=True)
     args = parser.parse_args()
 
     from utils.run_utils import setup_logger_kwargs
@@ -640,7 +655,7 @@ if __name__ == '__main__':
 
     logger_tb_args = dict()
     logger_tb_args['enable'] = args.tensorboard
-    if args.tensorboard:
+    if args.tensorboard or args.save_all_states:
         if args.reward_type is not None:
             instance_details = f"{args.env}-RT{args.reward_type}-{args.exp_name}-[{args.l}_{args.hid}]-beta_{args.beta}"
         else:
@@ -654,4 +669,4 @@ if __name__ == '__main__':
              ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
              gamma=args.gamma, seed=args.seed, epochs=args.epochs, beta=args.beta,
              estimate_rnd_every=args.estimate_rnd_every, RNDoutput_size=args.RNDoutput_size,
-             logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
+             save_all_states=args.save_all_states, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
