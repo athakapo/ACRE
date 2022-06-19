@@ -25,7 +25,7 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--tensorboard', type=bool, default=True)
     parser.add_argument('--aggregate_stats', type=int, default=100)
-
+    parser.add_argument('--save_all_states', type=bool, default=True)
     args = parser.parse_args()
 
     from utils.run_utils import setup_logger_kwargs
@@ -34,7 +34,7 @@ if __name__ == '__main__':
 
     logger_tb_args = dict()
     logger_tb_args['enable'] = args.tensorboard
-    if args.tensorboard:
+    if args.tensorboard or args.save_all_states:
         if args.reward_type is not None:
             instance_details = f"{args.env}-RT{args.reward_type}-{args.exp_name}-[{args.l}_{args.hid}]-wi_{args.w_i}"
         else:
@@ -49,4 +49,4 @@ if __name__ == '__main__':
         gamma=args.gamma, clip_ratio=0.4, pi_lr=args.learning_rate, vf_lr=args.learning_rate,
         train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=args.w_i,
         target_kl=0.01, seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, n_components=args.n_components,
-        logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
+        save_all_states=args.save_all_states, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)

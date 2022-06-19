@@ -43,6 +43,7 @@ if __name__ == '__main__':
              ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
              gamma=args.gamma, seed=args.seed, epochs=args.epochs, beta=args.beta,
              estimate_rnd_every=args.estimate_rnd_every, RNDoutput_size=args.RNDoutput_size,
-             save_all_states=args.save_all_states, rnd_num_nodes=args.rnd_num_nodes, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
+             save_all_states=args.save_all_states, rnd_num_nodes=args.rnd_num_nodes,
+             logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
 
 
