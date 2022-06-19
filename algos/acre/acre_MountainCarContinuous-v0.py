@@ -13,7 +13,7 @@ if __name__ == '__main__':
     parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=2)
-    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--epochs', type=int, default=125)
     parser.add_argument('--beta', type=float, default=0.01)
     parser.add_argument('--gmm_samples_mult', type=int, default=10)
     parser.add_argument('--n_components', type=float, default=7)
