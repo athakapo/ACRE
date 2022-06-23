@@ -80,8 +80,11 @@ Following [Spinning Up](https://spinningup.openai.com/en/latest/) nomenclature:
     │   │   ├── acre_MountainCarContinuous-v0.py <- Saved ACRE parameters for MountainCarContinuous-v0 environment
     │   │   ├── acre_Swimmer-v2.py      <- Saved ACRE parameters for Swimmer-v2 environment
     │   │   └── core.py                 <- Neural networks definitions and varius ACRE utilities
+    │   ├── acre_rnd                    <- ACRE+RND [ACRE + https://arxiv.org/abs/1810.12894]
     │   ├── ddpg                        <- DDPG https://arxiv.org/abs/1509.02971
     │   ├── ppo                         <- PPO https://arxiv.org/abs/1707.06347
+    │   ├── ppo_gmm                     <- PPO+GMM
+    │   ├── ppo_rnd                     <- PPO+RND https://arxiv.org/abs/1810.12894 
     │   ├── sac                         <- SAC https://arxiv.org/abs/1801.01290    
     │   └── td3                         <- TD3 https://arxiv.org/abs/1802.09477
     │
@@ -99,14 +102,35 @@ Following [Spinning Up](https://spinningup.openai.com/en/latest/) nomenclature:
     │   ├── ModifiedTensorBoard.py      <- Tensorboard
     │   ├── mpi_pytorch.py              <- Data-parallel PyTorch optimization across MPI processes
     │   ├── mpi_tools.py                <- MPI tools
+    │   ├── plot.py                     <- Plot handling
     │   ├── run_utils.py                <- Utilities for running experiments
     │   └── serialization_utils.py      <- Serialization utilities
     │
     ├── run_experiment_grid.py          <- Run the same algorithm with many possible hyperparameters
     ├── requirements.txt                <- The requirements file for reproducing the python environment
 
-Simulation results
+Evaluation results
 ------------
+### Investigating ACRE Novelty Signal Integration Mechanism
+
+Performance comparison:
+![ACRE experiments](images/ACRE_GMM_vs_PPO_GMM.png)
+
+State-space coverage study:
+
+<img src="images/ACRE_GMM_vs_PPO_GMM_states.png" width="645" height="379">
+
+### Investigating Gaussian Mixture Model as Novelty Estimator
+
+Performance comparison:
+![ACRE experiments](images/ACRE_GMM_vs_ACRE_RND.png)
+
+State-space coverage study:
+
+<img src="images/ACRE_GMM_vs_ACRE_RND_states.png" width="645" height="379">
+
+### Extensive Analysis on ACRE Performance
+
 ACRE algorithm was evaluated on **12 continuous control tasks** from the most well-known and used, openai-gym-style collections, using [Tonic RL library](https://github.com/fabiopardo/tonic). The evaluation was grouped into 3 bundles:
 
 1. Standard [openai-gym control](https://gym.openai.com/) tasks
@@ -127,7 +151,7 @@ ACRE algorithm was evaluated on **12 continuous control tasks** from the most we
 
 The performance of ACRE in comparison with [A2C](https://arxiv.org/abs/1602.01783), [DDPG](https://arxiv.org/abs/1509.02971), [PPO](https://arxiv.org/abs/1707.06347), [SAC](https://arxiv.org/abs/1801.01290), [TD3](https://arxiv.org/abs/1802.09477) and [TRPO](https://arxiv.org/abs/1502.05477) is illustrated in the following figure:
 
-![ACRE experiments](images/experiments.png)
+![ACRE experiments](images/all_experiments.png)
 
 Contributing
 ------------
