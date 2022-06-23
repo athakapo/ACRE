@@ -137,7 +137,7 @@ def ppo_gmm(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_t
             reward_eng=False, seed=0, steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
             vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=1.0, n_components=7,
             # TODO check me out
-            save_all_states=False, clip_obs=5, target_kl=0.01, logger_kwargs=dict(), logger_tb_args=dict(),
+             clip_obs=5, target_kl=0.01, logger_kwargs=dict(), logger_tb_args=dict(),
             save_freq=10):
     """
     Random Network Distillation (by clipping),
@@ -381,8 +381,6 @@ def ppo_gmm(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_t
     start_time = time.time()
     o, ep_ret, ep_len, intr_ret = env.reset(), 0, 0, 0
     t_ep = 0
-    if save_all_states:
-        all_states = [o]
 
 
     # Main loop: collect experience in env and update/log each epoch
@@ -411,10 +409,6 @@ def ppo_gmm(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_t
             # Update obs (critical!)
             o = next_o
 
-            if save_all_states:
-                # save all states for t-sne analysis
-                all_states.append(next_o)
-
             timeout = ep_len == max_ep_len
             terminal = d or timeout
             epoch_ended = t == local_steps_per_epoch - 1
@@ -435,8 +429,6 @@ def ppo_gmm(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_t
                         logger_tb.update_tensorboard_rnd(ep_ret, ep_len, intr_ret)
 
                 o, ep_ret, ep_len, intr_ret = env.reset(), 0, 0, 0
-                if save_all_states:
-                    all_states.append(o)
 
         # Save model
         if (epoch % save_freq == 0) or (epoch == epochs - 1):
@@ -464,11 +456,6 @@ def ppo_gmm(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), reward_t
         logger.log_tabular('Time', time.time() - start_time)
         logger.dump_tabular()
 
-        if save_all_states:
-            # Save pickle with all states
-            with open(f'{logger_tb.tensorboard_path}/all_states.pkl', 'wb') as f:
-                pickle.dump(all_states, f)
-
 
 if __name__ == '__main__':
     import argparse
@@ -491,7 +478,6 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--tensorboard', type=bool, default=True)
     parser.add_argument('--aggregate_stats', type=int, default=100)
-    parser.add_argument('--save_all_states', type=bool, default=True)
     args = parser.parse_args()
 
     # mpi_fork(args.cpu)  # run parallel code with mpi
@@ -517,4 +503,4 @@ if __name__ == '__main__':
             gamma=args.gamma, clip_ratio=0.2, pi_lr=args.learning_rate, vf_lr=args.learning_rate,
             train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000, w_i=args.w_i,
             target_kl=0.01, seed=args.seed, steps_per_epoch=args.steps, n_components=args.n_components,
-            save_all_states=args.save_all_states, epochs=args.epochs, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
+            epochs=args.epochs, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)

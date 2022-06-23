@@ -21,7 +21,6 @@ if __name__ == '__main__':
     parser.add_argument('--exp_name', type=str, default='acre_rnd')
     parser.add_argument('--tensorboard', type=bool, default=True)
     parser.add_argument('--aggregate_stats', type=int, default=100)
-    parser.add_argument('--save_all_states', type=bool, default=True)
     args = parser.parse_args()
 
     from utils.run_utils import setup_logger_kwargs
@@ -44,5 +43,4 @@ if __name__ == '__main__':
              ac_kwargs=dict(hidden_sizes=[args.hid] * args.l), reward_type=args.reward_type,
              gamma=args.gamma, seed=args.seed, epochs=args.epochs, beta=args.beta,
              estimate_rnd_every=args.estimate_rnd_every, RNDoutput_size=args.RNDoutput_size,
-             rnd_num_nodes=args.rnd_num_nodes,  save_all_states=args.save_all_states,
-             logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
+             rnd_num_nodes=args.rnd_num_nodes, logger_kwargs=logger_kwargs, logger_tb_args=logger_tb_args)
