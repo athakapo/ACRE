@@ -1,6 +1,6 @@
 # ACRE: Actor-Critic with Reward-Preserving Exploration
 
-ACRE is a model-free, off-policy RL algorithm specifically designed to incorporate **extra exploration signals without blurring the environmental rewards**. 
+ACRE is a model-free, off-policy RL algorithm specifically designed to incorporate **extra exploration signals without blurring the environmental rewards**. ACRE is shipped with a Gaussian Mixture Model (GMM) to calculate the instantaneous novelty.
 
 
 ![ACRE performance insights](images/acre_rationale.png)
