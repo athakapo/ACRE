@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=90)
-    parser.add_argument('--w_i', type=float, default=1.0)
+    parser.add_argument('--w_i', type=float, default=0.05)
     parser.add_argument('--n_components', type=int, default=7)
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--exp_name', type=str, default='ppo_gmm')
