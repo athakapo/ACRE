@@ -159,8 +159,7 @@ Contributions, issues and feature requests are welcome!
 Feel free to use [issues page](https://github.com/athakapo/ACRE/issues).
 
 
-## Citing this repository
-If you use this dataset, please cite the following publication:
+## Cite as:
 
 *Kapoutsis, A. C., Koutras, D. I., Korkas, C. D., & Kosmatopoulos, E. B. (2023). ACRE: Actor-Critic with Reward-Preserving Exploration. Neural Computing and Applications, 1-14.*
   \[[Link](https://link.springer.com/article/10.1007/s00521-023-08845-x)\]
